@@ -13,7 +13,7 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
-| `mvp-runtime-spec.md` | active | 定义 MVP runtime 的工具、策略、事件、provider 和输出要求 | 实现或调整 MVP 范围前 |
+| `mvp-runtime-spec.md` | active | 定义 MVP runtime 的工具、策略、事件、provider、配置来源和输出要求 | 实现或调整 MVP 范围前 |
 
 ## 4. Completed / Archived Documents
 

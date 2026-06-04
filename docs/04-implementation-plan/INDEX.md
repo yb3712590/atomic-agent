@@ -18,7 +18,7 @@
 
 | 文档 | 完成时间 | 保留原因 |
 |---|---|---|
-| _None_ | - | 当前没有已完成或归档文档 |
+| `configuration-source-semantics-plan.md` | 2026-06-04 | 已实施配置来源语义和 P0-001 核心模型，保留为实施记录 |
 
 ## 5. Update Rules
 

@@ -12,7 +12,7 @@ active
 
 | ID | Task | 状态 | 依据 |
 |---|---|---|---|
-| P0-001 | 定义核心数据模型：AgentInvocation、AgentRunResult、AgentAction、AgentEvent | pending | `docs/03-contracts/` |
+| P0-001 | 定义核心数据模型：AgentInvocation、AgentRunResult、AgentAction、AgentEvent | completed | `docs/03-contracts/` |
 | P0-002 | 实现 JSON action parser（JSON 动作解析器）和严格 schema validation（模式校验） | pending | `agent-action-protocol.md` |
 | P0-003 | 实现 workspace path guard（工作区路径守卫） | pending | `permission-and-sandbox-architecture.md` |
 | P0-004 | 实现 filesystem tools（文件系统工具）：list/read/search/write/patch | pending | `mvp-runtime-spec.md` |

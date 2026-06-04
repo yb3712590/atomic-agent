@@ -43,6 +43,19 @@ MVP 必须实现：
 - network allowlist guard（网络允许列表守卫）
 - max steps / max wall time（最大步数 / 最大运行时间）
 
+## Configuration Source Semantics
+
+MVP runtime（最小可行运行时）必须区分两种 invocation mode（调用模式）：
+
+1. Boardroom-managed invocation（Boardroom 管理调用）。
+2. Standalone invocation（独立调用）。
+
+Boardroom-managed invocation 中，`AgentInvocation`（智能体调用请求）是 runtime 的完整输入。runtime 不得读取 `.env`、environment variables（环境变量）、local config files（本地配置文件）或 process defaults（进程默认值）来补全缺失的 `AgentInvocation` 字段。缺失必需字段时必须 fail closed（失败关闭），并返回结构化失败结果；该请求缺陷应在 Boardroom OS（Boardroom 操作系统）项目内修复。
+
+Standalone invocation 中，standalone entrypoint（独立入口）可以读取 `.env` 来构造完整 `AgentInvocation`。构造完成后，runtime 只能接收显式 `AgentInvocation`，不能在执行过程中再次读取 `.env` 作为 fallback（兜底）。
+
+所有可暴露 configurable options（可配置选项）不得在 runtime code（运行时代码）中硬编码。provider（模型供应商）、model（模型）、workspace root（工作区根目录）、allowed write set（允许写入集合）、tools（工具集合）、permission policy（权限策略）、command policy（命令策略）、network policy（网络策略）、budgets（预算）、timeouts（超时）、ports（端口）和 output requirements（输出要求）必须来自显式 invocation input（调用输入）或 standalone `.env` 构造过程。
+
 ## Required Events
 
 MVP 必须记录：

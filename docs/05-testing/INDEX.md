@@ -13,6 +13,7 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
+| `testing-strategy.md` | active | 定义单元、工具、契约、权限负向、fake provider 和 real provider 测试策略 | 增加测试、修改测试门禁或实现 MVP 验收前 |
 
 ## 4. Completed / Archived Documents
 
@@ -22,11 +23,11 @@
 
 ## 5. Update Rules
 
-- 新增本目录文档时，必须把文档加入 `Current Active Documents`、`Completed / Archived Documents` 或明确的 superseded（已替代）/ abandoned（已放弃）记录。
-- 修改本目录内任何权威文档时，必须同步更新本 `INDEX.md`。
-- 如果变更影响全局阅读路径、当前活跃指针或权威文档集合，必须同步更新 `docs/INDEX.md`。
-- 未被本索引列出的文档不是本目录 authoritative document（权威文档）。
+- 测试文档必须区分 fake provider（假模型供应商）语义测试和 real provider（真实模型供应商）集成测试。
+- 修改测试门禁必须同步检查 acceptance（验收）。
+- 新增长期测试策略变化应写 ADR 或 architecture 文档。
+- 未被本索引列出的 testing 文档不是权威测试策略。
 
 ## 6. AI Reading Guidance
 
-测试文档必须区分 fake provider（假模型供应商）语义测试和 real provider（真实模型供应商）集成测试。
+测试文档必须区分 fake provider 语义测试和 real provider 集成测试。

@@ -13,6 +13,7 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
+| `mvp-acceptance.md` | active | 定义 MVP 功能、安全、事件、Boardroom 集成和文档验收 | 判断 MVP 或相关实现是否完成前 |
 
 ## 4. Completed / Archived Documents
 
@@ -22,11 +23,11 @@
 
 ## 5. Update Rules
 
-- 新增本目录文档时，必须把文档加入 `Current Active Documents`、`Completed / Archived Documents` 或明确的 superseded（已替代）/ abandoned（已放弃）记录。
-- 修改本目录内任何权威文档时，必须同步更新本 `INDEX.md`。
-- 如果变更影响全局阅读路径、当前活跃指针或权威文档集合，必须同步更新 `docs/INDEX.md`。
-- 未被本索引列出的文档不是本目录 authoritative document（权威文档）。
+- acceptance（验收）必须真实可验证；不得用 mock success path（模拟成功路径）代替。
+- 修改验收标准必须同步检查 testing（测试）和 backlog（待办）。
+- 安全门禁变化通常需要 ADR。
+- 未被本索引列出的 acceptance 文档不是权威验收标准。
 
 ## 6. AI Reading Guidance
 
-acceptance（验收）必须真实可验证；不得用 mock success path（模拟成功路径）代替。
+acceptance 必须真实可验证；不得用 mock success path 代替。

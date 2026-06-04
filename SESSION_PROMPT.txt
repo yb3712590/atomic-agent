@@ -1,0 +1,5 @@
+请先阅读README.md、docs/INDEX.md、docs/04-implementation-***/INDEX.md、docs/06-roadmap/roadmap.md。
+阅读后请完成三件事：
+1. 用极简摘要说明项目当前阶段、已完成内容、当前最高优先级。
+2. 从 backlog 中选择下一个合理的任务，并说明选择理由、依赖和验收标准。
+3. 先输出实施计划，等待我确认后再改代码或写文件。

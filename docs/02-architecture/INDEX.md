@@ -13,6 +13,9 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
+| `runtime-architecture.md` | active | 定义 runtime 组件、主循环、状态所有权和失败语义 | 设计 agent loop 或 runtime 模块前 |
+| `permission-and-sandbox-architecture.md` | active | 定义 fail-closed 权限模型、文件/命令/网络策略和沙箱边界 | 修改工具权限或 sandbox 行为前 |
+| `event-and-evidence-architecture.md` | active | 定义事件流、证据对象和 Boardroom evidence 映射 | 修改事件、证据或重放语义前 |
 
 ## 4. Completed / Archived Documents
 
@@ -22,10 +25,10 @@
 
 ## 5. Update Rules
 
-- 新增本目录文档时，必须把文档加入 `Current Active Documents`、`Completed / Archived Documents` 或明确的 superseded（已替代）/ abandoned（已放弃）记录。
-- 修改本目录内任何权威文档时，必须同步更新本 `INDEX.md`。
-- 如果变更影响全局阅读路径、当前活跃指针或权威文档集合，必须同步更新 `docs/INDEX.md`。
-- 未被本索引列出的文档不是本目录 authoritative document（权威文档）。
+- 架构文档只描述结构和边界，不承载 backlog（待办）或验收清单。
+- 长期架构取舍必须先写 ADR，再更新相关架构文档。
+- 修改架构边界时必须同步检查 contracts（契约）和 acceptance（验收）。
+- 未被本索引列出的 architecture 文档不是权威架构。
 
 ## 6. AI Reading Guidance
 

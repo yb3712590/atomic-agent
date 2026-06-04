@@ -13,6 +13,7 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
+| `roadmap.md` | active | 定义 M0-M5 阶段路线和退出条件 | 调整阶段目标或安排实现顺序前 |
 
 ## 4. Completed / Archived Documents
 
@@ -22,11 +23,11 @@
 
 ## 5. Update Rules
 
-- 新增本目录文档时，必须把文档加入 `Current Active Documents`、`Completed / Archived Documents` 或明确的 superseded（已替代）/ abandoned（已放弃）记录。
-- 修改本目录内任何权威文档时，必须同步更新本 `INDEX.md`。
-- 如果变更影响全局阅读路径、当前活跃指针或权威文档集合，必须同步更新 `docs/INDEX.md`。
-- 未被本索引列出的文档不是本目录 authoritative document（权威文档）。
+- roadmap（路线图）表达方向，不替代 implementation plan（实施计划）或 acceptance（验收）。
+- 阶段退出条件变化必须同步检查 acceptance 和 backlog。
+- 长期路线变化需要 ADR。
+- 未被本索引列出的 roadmap 文档不是权威路线。
 
 ## 6. AI Reading Guidance
 
-roadmap（路线图）表达方向，不替代 implementation plan（实施计划）或 acceptance（验收）。
+roadmap 表达方向，不替代 implementation plan 或 acceptance。

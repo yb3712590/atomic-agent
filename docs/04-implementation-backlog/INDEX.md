@@ -13,6 +13,7 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
+| `backlog.md` | active | 维护 P0/P1/P2 实现任务、依赖和阻塞项 | 领取、调整或完成实现任务前 |
 
 ## 4. Completed / Archived Documents
 
@@ -22,11 +23,11 @@
 
 ## 5. Update Rules
 
-- 新增本目录文档时，必须把文档加入 `Current Active Documents`、`Completed / Archived Documents` 或明确的 superseded（已替代）/ abandoned（已放弃）记录。
-- 修改本目录内任何权威文档时，必须同步更新本 `INDEX.md`。
-- 如果变更影响全局阅读路径、当前活跃指针或权威文档集合，必须同步更新 `docs/INDEX.md`。
-- 未被本索引列出的文档不是本目录 authoritative document（权威文档）。
+- P0/P1 backlog（待办）必须链接对应 spec（规格）、ADR（架构决策记录）或 acceptance（验收）。
+- 完成任务后更新 `backlog.md`，必要时同步更新 `docs/INDEX.md`。
+- 阻塞任务必须写清 blocker（阻塞原因）。
+- 未被本索引列出的 backlog 文档不是权威任务入口。
 
 ## 6. AI Reading Guidance
 
-P0/P1 backlog（待办）必须链接对应 spec（规格）、ADR（架构决策记录）或 acceptance（验收）。
+P0/P1 backlog 必须链接对应 spec、ADR 或 acceptance。

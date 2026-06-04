@@ -13,6 +13,7 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
+| `genericagent-and-codex-reference.md` | active | 记录 GenericAgent 和 Codex 调研结论、可借鉴点与不可直接采用原因 | 查外部项目参考或解释 ADR 背景时 |
 
 ## 4. Completed / Archived Documents
 
@@ -22,11 +23,11 @@
 
 ## 5. Update Rules
 
-- 新增本目录文档时，必须把文档加入 `Current Active Documents`、`Completed / Archived Documents` 或明确的 superseded（已替代）/ abandoned（已放弃）记录。
-- 修改本目录内任何权威文档时，必须同步更新本 `INDEX.md`。
-- 如果变更影响全局阅读路径、当前活跃指针或权威文档集合，必须同步更新 `docs/INDEX.md`。
-- 未被本索引列出的文档不是本目录 authoritative document（权威文档）。
+- reference（参考资料）不是权威设计；采纳外部方案必须通过 ADR 或架构文档。
+- 外部 API 或项目事实变化时更新对应参考文档。
+- 如果参考结论影响实现，必须同步更新 architecture、contract、acceptance 或 ADR。
+- 未被本索引列出的 reference 文档不是权威参考入口。
 
 ## 6. AI Reading Guidance
 
-reference（参考资料）不是权威设计；采纳外部方案必须通过 ADR 或架构文档。
+reference 不是权威设计；采纳外部方案必须通过 ADR 或架构文档。

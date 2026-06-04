@@ -22,6 +22,7 @@
 | `P0-002-json-action-parser-plan.md` | 2026-06-04 | 已实施 P0-002 JSON action parser，保留为 TDD 实施记录 |
 | `P0-003-workspace-path-guard-plan.md` | 2026-06-04 | 已实施 P0-003 workspace path guard，保留为 TDD 实施记录 |
 | `P0-004-filesystem-tools-plan.md` | 2026-06-05 | 已实施 P0-004 filesystem tools（文件系统工具），保留为 TDD 实施记录 |
+| `P0-005-command-policy-run-command-plan.md` | 2026-06-05 | 已实施 P0-005 command policy（命令策略）和 run_command（运行声明命令），保留为 TDD 实施记录 |
 
 ## 5. Update Rules
 

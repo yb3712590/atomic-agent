@@ -22,6 +22,7 @@
 | `P0-002-json-action-parser-spec.md` | 2026-06-04 | 已实现 P0-002 JSON action parser，保留为实现规格记录 |
 | `P0-003-workspace-path-guard-spec.md` | 2026-06-04 | 已实现 P0-003 workspace path guard，保留为路径权限规格记录 |
 | `P0-004-filesystem-tools-spec.md` | 2026-06-05 | 已实现 P0-004 filesystem tools（文件系统工具），保留为工具规格记录 |
+| `P0-005-command-policy-run-command-spec.md` | 2026-06-05 | 已实现 P0-005 command policy（命令策略）和 run_command（运行声明命令），保留为命令执行规格记录 |
 
 ## 5. Update Rules
 

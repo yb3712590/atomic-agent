@@ -146,3 +146,25 @@ def test_agent_event_rejects_zero_sequence():
             previous_event_hash=None,
             event_hash="sha256:first",
         )
+
+
+@pytest.mark.parametrize("forbidden_key", ["command", "shell", "cmd"])
+def test_agent_action_rejects_run_command_without_command_id(forbidden_key):
+    with pytest.raises(ValidationError):
+        AgentAction(
+            action_id="step-0006",
+            action="run_command",
+            reason_summary="Run tests.",
+            input={forbidden_key: "pytest -v"},
+        )
+
+
+def test_agent_action_accepts_run_command_with_command_id():
+    action = AgentAction(
+        action_id="step-0007",
+        action="run_command",
+        reason_summary="Run declared tests.",
+        input={"command_id": "test"},
+    )
+
+    assert action.input == {"command_id": "test"}

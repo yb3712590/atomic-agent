@@ -67,6 +67,17 @@ class AgentAction(StrictModel):
     reason_summary: str
     input: dict[str, Any]
 
+    @model_validator(mode="after")
+    def run_command_uses_command_id(self):
+        if self.action != AgentActionType.RUN_COMMAND:
+            return self
+        forbidden_keys = {"command", "shell", "cmd"}
+        if forbidden_keys.intersection(self.input):
+            raise ValueError("run_command input must use command_id, not a shell command string")
+        if "command_id" not in self.input:
+            raise ValueError("run_command input requires command_id")
+        return self
+
 
 class AgentEvent(StrictModel):
     event_id: str

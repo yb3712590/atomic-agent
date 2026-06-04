@@ -19,7 +19,7 @@
 
 | 文档 | 完成时间 | 保留原因 |
 |---|---|---|
-| _None_ | - | 当前没有已完成或归档文档 |
+| `action-parser-spec.md` | 2026-06-04 | 已实现 P0-002 JSON action parser，保留为实现规格记录 |
 
 ## 5. Update Rules
 

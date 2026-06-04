@@ -24,6 +24,7 @@
 | 设计 Boardroom 接口 | `docs/INDEX.md` -> `docs/03-contracts/INDEX.md` -> `docs/03-contracts/agent-runtime-port.md` |
 | 设计动作协议 | `docs/INDEX.md` -> `docs/03-contracts/agent-action-protocol.md` -> `docs/09-adr/0002-use-provider-agnostic-action-protocol.md` |
 | 执行实现任务 | `docs/INDEX.md` -> `docs/04-implementation-backlog/backlog.md` -> `docs/04-implementation-spec/mvp-runtime-spec.md` |
+| 结束 P 阶段并规划下一波次 | `docs/INDEX.md` -> `docs/04-implementation-backlog/backlog.md` -> `docs/06-roadmap/roadmap.md` -> `docs/04-implementation-backlog/backlog.md` |
 | 判断是否完成 | `docs/INDEX.md` -> `docs/04-implementation-acceptance/mvp-acceptance.md` -> `docs/05-testing/testing-strategy.md` |
 | 查路线图 | `docs/INDEX.md` -> `docs/06-roadmap/roadmap.md` |
 | 查外部参考 | `docs/INDEX.md` -> `docs/08-reference/genericagent-and-codex-reference.md` |

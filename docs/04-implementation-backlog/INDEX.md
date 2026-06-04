@@ -24,6 +24,9 @@
 ## 5. Update Rules
 
 - P0/P1 backlog（待办）必须链接对应 spec（规格）、ADR（架构决策记录）或 acceptance（验收）。
+- P0/P1/P2 表示 execution wave（执行波次），不是 roadmap milestone（路线图里程碑）。
+- 完成一个 P wave 后，必须先执行 roadmap review（路线图复审），再编制或重组下一个 P wave。
+- roadmap review 不作为普通 backlog task（待办任务）编号；应记录为 P-stage exit gate（P 阶段退出门禁）。
 - 完成任务后更新 `backlog.md`，必要时同步更新 `docs/INDEX.md`。
 - 阻塞任务必须写清 blocker（阻塞原因）。
 - 未被本索引列出的 backlog 文档不是权威任务入口。

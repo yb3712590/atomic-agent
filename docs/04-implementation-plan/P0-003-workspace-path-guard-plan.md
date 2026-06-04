@@ -42,7 +42,7 @@ Out of scope:
 - Modify after implementation passes: `docs/04-implementation-backlog/backlog.md`
   - Marks P0-003 completed only after tests pass and review accepts implementation.
 - Modify after implementation passes: `docs/04-implementation-spec/INDEX.md`
-  - Moves `workspace-path-guard-spec.md`（路径守卫规格） from draft to implemented or approved status.
+  - Moves `P0-003-workspace-path-guard-spec.md`（路径守卫规格） from draft to implemented or approved status.
 - Modify after implementation passes: `docs/04-implementation-plan/INDEX.md`
   - Moves this plan from current draft to completed / archived.
 
@@ -830,8 +830,8 @@ Expected:
 ```text
  M docs/04-implementation-plan/INDEX.md
  M docs/04-implementation-spec/INDEX.md
-?? docs/04-implementation-plan/workspace-path-guard-plan.md
-?? docs/04-implementation-spec/workspace-path-guard-spec.md
+?? docs/04-implementation-plan/P0-003-workspace-path-guard-plan.md
+?? docs/04-implementation-spec/P0-003-workspace-path-guard-spec.md
 ?? src/atomic_agent/path_guard.py
 ?? tests/test_path_guard.py
 ```
@@ -859,16 +859,16 @@ Change `docs/04-implementation-backlog/backlog.md` from:
 To:
 
 ```markdown
-| P0-003 | 实现 workspace path guard（工作区路径守卫） | completed | `workspace-path-guard-spec.md`, `permission-and-sandbox-architecture.md` |
+| P0-003 | 实现 workspace path guard（工作区路径守卫） | completed | `P0-003-workspace-path-guard-spec.md`, `permission-and-sandbox-architecture.md` |
 ```
 
 - [ ] **Step 2: Move spec index entry out of draft status**
 
-Change `docs/04-implementation-spec/INDEX.md` current entry for `workspace-path-guard-spec.md` from `draft` to `implemented` after tests pass and user review accepts the implementation.
+Change `docs/04-implementation-spec/INDEX.md` current entry for `P0-003-workspace-path-guard-spec.md` from `draft` to `implemented` after tests pass and user review accepts the implementation.
 
 - [ ] **Step 3: Move plan index entry to completed / archived**
 
-Move `workspace-path-guard-plan.md` from Current Active Documents to Completed / Archived Documents after P0-003 is implemented and verified.
+Move `P0-003-workspace-path-guard-plan.md` from Current Active Documents to Completed / Archived Documents after P0-003 is implemented and verified.
 
 - [ ] **Step 4: Run final verification**
 
@@ -893,7 +893,7 @@ PASSED
 
 Before implementation is considered ready for review:
 
-- [ ] Spec coverage: All P0-003 requirements in `workspace-path-guard-spec.md` are covered by tests or code.
+- [ ] Spec coverage: All P0-003 requirements in `P0-003-workspace-path-guard-spec.md` are covered by tests or code.
 - [ ] Placeholder scan: This plan contains no placeholders, deferred implementation steps, or unspecified test cases.
 - [ ] Type consistency: `PathDecisionType`, `PathDecision`, `PathGuardConfigError`, `WorkspacePathGuard`, and method names match across tests and implementation steps.
 - [ ] Scope check: No filesystem tool execution, event recording, command policy, network policy, provider logic, budget logic, or AgentLoop logic is included.

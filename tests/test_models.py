@@ -17,7 +17,7 @@ def valid_invocation_payload():
         "invocation_id": "inv_001",
         "task": "Read README and summarize current phase.",
         "workspace_root": "/workspace/project",
-        "allowed_write_set": ["docs/04-implementation-plan/configuration-source-semantics-plan.md"],
+        "allowed_write_set": ["docs/04-implementation-plan/P0-001-configuration-source-semantics-plan.md"],
         "tools": ["list_files", "read_file"],
         "permission_policy": {"file_reads": "workspace", "file_writes": "allowed_write_set"},
         "provider_profile": {"provider": "anthropic", "model": "claude-opus-4-7"},

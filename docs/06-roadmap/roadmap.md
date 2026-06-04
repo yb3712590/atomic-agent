@@ -8,6 +8,33 @@ active
 
 本文定义 `atomic-agent`（原子智能体）的阶段路线，防止项目过早扩张为大型 agent framework（智能体框架）。
 
+## Planning Model
+
+`M0/M1/M2...` 表示 milestone（能力里程碑），用于描述项目在产品能力、架构能力和集成能力上的阶段目标。
+
+`P0/P1/P2...` 表示 execution wave（滚动执行波次），用于组织当前和近端实现任务。P 阶段不是 milestone（里程碑）的完整镜像，也不是项目终点编号。
+
+一个 P wave（执行波次）可以服务多个 milestone；一个 milestone 也可以跨多个 P wave 完成。backlog（待办）不预先穷尽所有未来 milestone 的任务。远期能力保持在 roadmap（路线图）中，只有在 P-stage exit review（P 阶段退出复审）后，才把下一组 cohesive work package（内聚工作包）编入下一个 P wave。
+
+## Roadmap Review Protocol
+
+roadmap review（路线图复审）只在 P-stage exit（P 阶段退出）时触发，除非出现影响长期路线的 blocker（阻塞）或 ADR（架构决策记录）级决策。
+
+每次 P-stage exit review 必须完成：
+
+1. 对照 milestone exit criteria（里程碑退出标准），判断哪些 M 条目已满足、部分满足或失效。
+2. 检查当前 P wave 的完成项是否改变下一阶段优先级。
+3. 识别新增、删除或重组的 cohesive work package。
+4. 更新 backlog 中下一个 P wave 的任务集合。
+5. 如长期路线、项目边界或架构原则变化，先写 ADR。
+6. 如产生阶段复盘价值，写入 project log（项目日志）。
+
+## Current Planned Endpoint
+
+当前规划终点是 M5：external coding agent bridge（外部编码智能体桥接）。M5 完成后是否继续扩展，必须在后续 roadmap review 中重新评估。
+
+M5 之前，`atomic-agent` 应保持为 Boardroom OS（Boardroom 操作系统）可调用、受权限约束、可审计的 runtime（运行时），而不是独立 SaaS（软件即服务）、大型多租户调度系统或 Boardroom OS 替代品。
+
 ## Milestones
 
 | Milestone | 中文解释 | 目标 |

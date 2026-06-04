@@ -166,7 +166,7 @@ def valid_invocation_payload():
         "invocation_id": "inv_001",
         "task": "Read README and summarize current phase.",
         "workspace_root": "/workspace/project",
-        "allowed_write_set": ["docs/04-implementation-plan/configuration-source-semantics-plan.md"],
+        "allowed_write_set": ["docs/04-implementation-plan/P0-001-configuration-source-semantics-plan.md"],
         "tools": ["list_files", "read_file"],
         "permission_policy": {"file_reads": "workspace", "file_writes": "allowed_write_set"},
         "provider_profile": {"provider": "anthropic", "model": "claude-opus-4-7"},
@@ -523,7 +523,7 @@ Expected: Diff contains no `.env` fallback in runtime source and no hardcoded pr
 Run only after explicit user approval:
 
 ```bash
-git add docs/04-implementation-spec/mvp-runtime-spec.md docs/04-implementation-plan/INDEX.md docs/04-implementation-plan/configuration-source-semantics-plan.md docs/04-implementation-backlog/backlog.md pyproject.toml src/atomic_agent/__init__.py src/atomic_agent/models.py tests/test_models.py
+git add docs/04-implementation-spec/mvp-runtime-spec.md docs/04-implementation-plan/INDEX.md docs/04-implementation-plan/P0-001-configuration-source-semantics-plan.md docs/04-implementation-backlog/backlog.md pyproject.toml src/atomic_agent/__init__.py src/atomic_agent/models.py tests/test_models.py
 git commit -m "feat: 定义核心模型配置边界"
 ```
 

@@ -19,8 +19,8 @@
 
 | 文档 | 完成时间 | 保留原因 |
 |---|---|---|
-| `action-parser-spec.md` | 2026-06-04 | 已实现 P0-002 JSON action parser，保留为实现规格记录 |
-| `workspace-path-guard-spec.md` | 2026-06-04 | 已实现 P0-003 workspace path guard，保留为路径权限规格记录 |
+| `P0-002-json-action-parser-spec.md` | 2026-06-04 | 已实现 P0-002 JSON action parser，保留为实现规格记录 |
+| `P0-003-workspace-path-guard-spec.md` | 2026-06-04 | 已实现 P0-003 workspace path guard，保留为路径权限规格记录 |
 
 ## 5. Update Rules
 

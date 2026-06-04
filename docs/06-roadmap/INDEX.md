@@ -23,9 +23,10 @@
 
 ## 5. Update Rules
 
-- roadmap（路线图）表达方向，不替代 implementation plan（实施计划）或 acceptance（验收）。
-- 阶段退出条件变化必须同步检查 acceptance 和 backlog。
-- 长期路线变化需要 ADR。
+- roadmap（路线图）表达 milestone（里程碑）、exit criteria（退出标准）和长期方向，不替代 implementation plan（实施计划）或 backlog（待办）。
+- P-stage exit（P 阶段退出）必须触发 roadmap review（路线图复审）。
+- roadmap review 结果必须同步检查 acceptance（验收）、testing strategy（测试策略）和 backlog（待办）。
+- 长期路线、项目边界或架构原则变化需要 ADR。
 - 未被本索引列出的 roadmap 文档不是权威路线。
 
 ## 6. AI Reading Guidance

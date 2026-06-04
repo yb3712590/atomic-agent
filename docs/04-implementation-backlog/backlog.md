@@ -23,7 +23,7 @@ P wave 完成后，必须先完成 roadmap review（路线图复审），再编�
 | P0-001 | 定义核心数据模型：AgentInvocation、AgentRunResult、AgentAction、AgentEvent | completed | `docs/03-contracts/` |
 | P0-002 | 实现 JSON action parser（JSON 动作解析器）和严格 schema validation（模式校验） | completed | `agent-action-protocol.md` |
 | P0-003 | 实现 workspace path guard（工作区路径守卫） | completed | `P0-003-workspace-path-guard-spec.md`, `permission-and-sandbox-architecture.md` |
-| P0-004 | 实现 filesystem tools（文件系统工具）：list/read/search/write/patch | pending | `mvp-runtime-spec.md` |
+| P0-004 | 实现 filesystem tools（文件系统工具）：list/read/search/write/patch | completed | `P0-004-filesystem-tools-spec.md`, `mvp-runtime-spec.md` |
 | P0-005 | 实现 command policy（命令策略）和 run_command | pending | `mvp-runtime-spec.md` |
 | P0-006 | 实现 event recorder（事件记录器）和 JSONL 输出 | pending | `event-stream-protocol.md` |
 | P0-007 | 实现最小 AgentLoop（智能体循环） | pending | `runtime-architecture.md` |

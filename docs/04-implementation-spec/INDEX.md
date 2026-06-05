@@ -24,6 +24,7 @@
 | `P0-004-filesystem-tools-spec.md` | 2026-06-05 | 已实现 P0-004 filesystem tools（文件系统工具），保留为工具规格记录 |
 | `P0-005-command-policy-run-command-spec.md` | 2026-06-05 | 已实现 P0-005 command policy（命令策略）和 run_command（运行声明命令），保留为命令执行规格记录 |
 | `P0-006-event-recorder-jsonl-spec.md` | 2026-06-05 | 已实现 P0-006 event recorder（事件记录器）和 JSONL event stream（JSONL 事件流），保留为事件流规格记录 |
+| `P0-007-minimal-agent-loop-spec.md` | 2026-06-05 | 已实现 P0-007 minimal AgentLoop（最小智能体循环），保留为循环规格记录 |
 
 ## 5. Update Rules
 

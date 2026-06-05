@@ -35,6 +35,18 @@ def fixed_clock():
     return "2026-06-05T00:00:00Z"
 
 
+class FakeRuntimeClock:
+    def __init__(self, readings):
+        self.readings = list(readings)
+        self.calls = 0
+
+    def __call__(self) -> float:
+        self.calls += 1
+        if self.readings:
+            return self.readings.pop(0)
+        return 0.0
+
+
 def action(action_id, action_name, input_payload):
     return json.dumps(
         {
@@ -74,12 +86,13 @@ def make_invocation(tmp_path, tools=None, budgets=None, allowed_write_set=None):
             "max_steps": 8,
             "max_parse_failures": 1,
             "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
         },
         output_requirements={"summary": True, "event_stream": True},
     )
 
 
-def make_loop(tmp_path, provider):
+def make_loop(tmp_path, provider, runtime_clock=None):
     event_dir = tmp_path / "events"
     event_dir.mkdir()
     artifact_dir = tmp_path / "artifacts"
@@ -126,6 +139,8 @@ def make_loop(tmp_path, provider):
             artifact_ref_prefix="artifact://run_001",
         )
     )
+    if runtime_clock is None:
+        runtime_clock = FakeRuntimeClock([0.0] * 100)
     loop = AgentLoop(
         AgentLoopConfig(run_id="run_001"),
         AgentLoopDependencies(
@@ -134,6 +149,7 @@ def make_loop(tmp_path, provider):
             command_tools=command_tools,
             event_recorder=recorder,
             artifact_writer=artifact_writer,
+            runtime_clock=runtime_clock,
         ),
     )
     return loop, recorder.config.event_stream_path
@@ -316,7 +332,7 @@ def test_agent_loop_records_auditable_event_stream_details(tmp_path):
         (
             "max_steps_exceeded",
             [action("step-0001", "list_files", {"path": "work", "recursive": False})],
-            {"budgets": {"max_steps": 1, "max_parse_failures": 1, "max_observation_chars": 10000}},
+            {"budgets": {"max_steps": 1, "max_parse_failures": 1, "max_observation_chars": 10000, "max_wall_seconds": 30.0}},
             "max_steps_exceeded",
             None,
             "run.failed",
@@ -356,3 +372,201 @@ def test_agent_loop_fails_closed_for_runtime_errors(
     assert events[-1]["payload"]["error"]["kind"] == failure_kind
     assert expected_event in [event["type"] for event in events]
     assert all(event["type"] != "run.completed" for event in events)
+
+
+def test_agent_loop_fails_closed_when_max_wall_seconds_is_missing(tmp_path):
+    provider = ScriptedProvider([])
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        budgets={
+            "max_steps": 3,
+            "max_parse_failures": 1,
+            "max_observation_chars": 10000,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "invalid_invocation"
+    assert "max_wall_seconds" in result.failure_message
+    assert provider.contexts == []
+    events = read_jsonl(event_stream_path)
+    assert [event["type"] for event in events] == ["run.started", "run.failed"]
+
+
+@pytest.mark.parametrize("max_wall_seconds", [0, -1, True, float("nan"), float("inf"), "30"])
+def test_agent_loop_fails_closed_when_max_wall_seconds_is_invalid(tmp_path, max_wall_seconds):
+    provider = ScriptedProvider([])
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        budgets={
+            "max_steps": 3,
+            "max_parse_failures": 1,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": max_wall_seconds,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "invalid_invocation"
+    assert "max_wall_seconds" in result.failure_message
+    assert provider.contexts == []
+    events = read_jsonl(event_stream_path)
+    assert [event["type"] for event in events] == ["run.started", "run.failed"]
+
+
+def test_agent_loop_fails_closed_when_wall_time_exceeded_before_provider_turn(tmp_path):
+    provider = ScriptedProvider([action("step-0001", "submit_result", {"summary": "Done", "produced_paths": [], "evidence_refs": []})])
+    runtime_clock = FakeRuntimeClock([0.0, 31.0])
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "max_wall_seconds_exceeded"
+    assert result.failed_action_ref is None
+    assert provider.contexts == []
+    events = read_jsonl(event_stream_path)
+    assert [event["type"] for event in events] == ["run.started", "run.failed"]
+
+
+def test_agent_loop_fails_closed_when_wall_time_exceeded_after_provider_turn(tmp_path):
+    provider = ScriptedProvider([action("step-0001", "write_file", {"path": "work/output.txt", "content": "draft"})])
+    runtime_clock = FakeRuntimeClock([0.0, 0.0, 31.0])
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "max_wall_seconds_exceeded"
+    assert result.failed_action_ref == "provider_turn_000001"
+    assert len(provider.contexts) == 1
+    assert not (tmp_path / "work" / "output.txt").exists()
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types == ["run.started", "provider.turn.started", "provider.turn.completed", "run.failed"]
+
+
+def test_agent_loop_fails_closed_when_wall_time_exceeded_after_tool_result(tmp_path):
+    provider = ScriptedProvider(
+        [
+            action("step-0001", "write_file", {"path": "work/output.txt", "content": "draft"}),
+            action("step-0002", "submit_result", {"summary": "Done", "produced_paths": ["work/output.txt"], "evidence_refs": []}),
+        ]
+    )
+    runtime_clock = FakeRuntimeClock([0.0, 0.0, 0.0, 0.0, 31.0])
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "max_wall_seconds_exceeded"
+    assert result.failed_action_ref == "step-0001"
+    assert len(provider.contexts) == 1
+    assert (tmp_path / "work" / "output.txt").read_text(encoding="utf-8") == "draft"
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types[-4:] == [
+        "tool.attempt.started",
+        "tool.attempt.completed",
+        "workspace.mutation.recorded",
+        "run.failed",
+    ]
+    assert "result.submitted" not in event_types
+    assert "run.completed" not in event_types
+
+
+def test_agent_loop_fails_closed_when_runtime_clock_moves_backwards(tmp_path):
+    provider = ScriptedProvider([action("step-0001", "submit_result", {"summary": "Done", "produced_paths": [], "evidence_refs": []})])
+    runtime_clock = FakeRuntimeClock([10.0, 9.0])
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "invalid_invocation"
+    assert provider.contexts == []
+    assert [event["type"] for event in read_jsonl(event_stream_path)] == ["run.started", "run.failed"]
+
+
+def test_agent_loop_fails_closed_when_runtime_clock_returns_non_finite_value(tmp_path):
+    provider = ScriptedProvider([])
+    runtime_clock = FakeRuntimeClock([float("nan")])
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "invalid_invocation"
+    assert provider.contexts == []
+    assert [event["type"] for event in read_jsonl(event_stream_path)] == ["run.started", "run.failed"]
+
+
+def test_agent_loop_fails_closed_when_runtime_clock_raises(tmp_path):
+    provider = ScriptedProvider([])
+
+    def failing_runtime_clock() -> float:
+        raise RuntimeError("clock unavailable")
+
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=failing_runtime_clock)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "invalid_invocation"
+    assert "runtime_clock failed" in result.failure_message
+    assert "clock unavailable" in result.failure_message
+    assert provider.contexts == []
+    assert [event["type"] for event in read_jsonl(event_stream_path)] == ["run.started", "run.failed"]
+
+
+def test_agent_loop_preserves_invalid_json_retry_limit_with_wall_budget(tmp_path):
+    provider = ScriptedProvider(["not json", "still not json"])
+    runtime_clock = FakeRuntimeClock([0.0] * 100)
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+    invocation = make_invocation(
+        tmp_path,
+        budgets={
+            "max_steps": 4,
+            "max_parse_failures": 1,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "action_parse_failed"
+    assert len(provider.contexts) == 2
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types.count("action.rejected") == 2
+    assert event_types[-1] == "run.failed"
+
+
+def test_agent_loop_preserves_max_steps_failure_with_wall_budget(tmp_path):
+    (tmp_path / "work").mkdir()
+    provider = ScriptedProvider([action("step-0001", "list_files", {"path": "work", "recursive": False})])
+    runtime_clock = FakeRuntimeClock([0.0] * 100)
+    loop, event_stream_path = make_loop(tmp_path, provider, runtime_clock=runtime_clock)
+    invocation = make_invocation(
+        tmp_path,
+        budgets={
+            "max_steps": 1,
+            "max_parse_failures": 1,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "max_steps_exceeded"
+    assert result.failed_action_ref is None
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types[-1] == "run.failed"
+    assert "run.completed" not in event_types

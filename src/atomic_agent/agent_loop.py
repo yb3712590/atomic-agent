@@ -1,6 +1,7 @@
 from dataclasses import dataclass, field
 import json
-from typing import Any, Literal, Protocol
+import math
+from typing import Any, Callable, Literal, Protocol
 
 from atomic_agent.action_parser import ActionParseError, parse_agent_action
 from atomic_agent.artifacts import ArtifactWriter
@@ -45,6 +46,7 @@ class AgentLoopDependencies:
     command_tools: CommandTools
     event_recorder: EventRecorder
     artifact_writer: ArtifactWriter
+    runtime_clock: Callable[[], float]
 
 
 @dataclass(frozen=True)
@@ -73,6 +75,7 @@ class _RuntimeRequirements:
     max_steps: int
     max_parse_failures: int
     max_observation_chars: int
+    max_wall_seconds: float
 
 
 class AgentLoop:
@@ -94,8 +97,25 @@ class AgentLoop:
                 failed_action_ref=None,
             )
         requirements = requirements_or_error
+        started_at_or_error = self._read_runtime_clock()
+        if isinstance(started_at_or_error, str):
+            return self._fail(
+                state=state,
+                failure_kind="invalid_invocation",
+                failure_message=started_at_or_error,
+                failed_action_ref=None,
+            )
+        started_at = started_at_or_error
 
         for step in range(1, requirements.max_steps + 1):
+            wall_time_error = self._check_wall_time_budget(
+                started_at,
+                requirements,
+                "max_wall_seconds exceeded before provider turn",
+                None,
+            )
+            if wall_time_error is not None:
+                return self._fail(state, *wall_time_error)
             provider_turn_id = f"provider_turn_{step:06d}"
             self.dependencies.event_recorder.record_provider_turn_started(provider_turn_id)
             try:
@@ -115,6 +135,14 @@ class AgentLoop:
             )
             state.artifacts.append(output_artifact)
             self.dependencies.event_recorder.record_provider_turn_completed(provider_turn_id, output_artifact)
+            wall_time_error = self._check_wall_time_budget(
+                started_at,
+                requirements,
+                "max_wall_seconds exceeded after provider turn",
+                provider_turn_id,
+            )
+            if wall_time_error is not None:
+                return self._fail(state, *wall_time_error)
 
             try:
                 action = parse_agent_action(provider_output)
@@ -153,6 +181,14 @@ class AgentLoop:
                     EventError("policy_denied", decision.reason, retryable=False, related_ref=action.action_id).to_payload()
                 )
                 return self._fail(state, "policy_denied", decision.reason, action.action_id)
+            wall_time_error = self._check_wall_time_budget(
+                started_at,
+                requirements,
+                "max_wall_seconds exceeded before action execution",
+                action.action_id,
+            )
+            if wall_time_error is not None:
+                return self._fail(state, *wall_time_error)
 
             if action.action == AgentActionType.SUBMIT_RESULT:
                 submission_error = self._validate_result_submission(action)
@@ -176,6 +212,14 @@ class AgentLoop:
             )
             result = self._execute_tool_action(action)
             self._record_tool_result(state, requirements, action, tool_attempt_id, result)
+            wall_time_error = self._check_wall_time_budget(
+                started_at,
+                requirements,
+                "max_wall_seconds exceeded after tool execution",
+                action.action_id,
+            )
+            if wall_time_error is not None:
+                return self._fail(state, *wall_time_error)
             if not result.ok:
                 message = result.error_message or "tool action failed"
                 return self._fail(state, "tool_failed", message, action.action_id)
@@ -194,15 +238,56 @@ class AgentLoop:
         max_steps = invocation.budgets.get("max_steps")
         max_parse_failures = invocation.budgets.get("max_parse_failures")
         max_observation_chars = invocation.budgets.get("max_observation_chars")
+        max_wall_seconds = invocation.budgets.get("max_wall_seconds")
         if not isinstance(max_steps, int) or isinstance(max_steps, bool) or max_steps <= 0:
             return "budgets.max_steps must be a positive integer"
         if not isinstance(max_parse_failures, int) or isinstance(max_parse_failures, bool) or max_parse_failures < 0:
             return "budgets.max_parse_failures must be a non-negative integer"
         if not isinstance(max_observation_chars, int) or isinstance(max_observation_chars, bool) or max_observation_chars <= 0:
             return "budgets.max_observation_chars must be a positive integer"
+        if (
+            not isinstance(max_wall_seconds, int | float)
+            or isinstance(max_wall_seconds, bool)
+            or not math.isfinite(max_wall_seconds)
+            or max_wall_seconds <= 0
+        ):
+            return "budgets.max_wall_seconds must be a finite positive number"
         if "submit_result" not in invocation.tools:
             return "invocation.tools must include submit_result"
-        return _RuntimeRequirements(policy_ref, max_steps, max_parse_failures, max_observation_chars)
+        return _RuntimeRequirements(
+            policy_ref=policy_ref,
+            max_steps=max_steps,
+            max_parse_failures=max_parse_failures,
+            max_observation_chars=max_observation_chars,
+            max_wall_seconds=float(max_wall_seconds),
+        )
+
+    def _read_runtime_clock(self) -> float | str:
+        try:
+            reading = self.dependencies.runtime_clock()
+        except Exception as error:
+            message = str(error) or error.__class__.__name__
+            return f"runtime_clock failed: {message}"
+        if not isinstance(reading, int | float) or isinstance(reading, bool) or not math.isfinite(reading):
+            return "runtime_clock must return a finite number"
+        return float(reading)
+
+    def _check_wall_time_budget(
+        self,
+        started_at: float,
+        requirements: _RuntimeRequirements,
+        exceeded_message: str,
+        failed_action_ref: str | None,
+    ) -> tuple[str, str, str | None] | None:
+        now_or_error = self._read_runtime_clock()
+        if isinstance(now_or_error, str):
+            return "invalid_invocation", now_or_error, failed_action_ref
+        elapsed_seconds = now_or_error - started_at
+        if elapsed_seconds < 0:
+            return "invalid_invocation", "runtime_clock must be monotonic during AgentLoop.run", failed_action_ref
+        if elapsed_seconds > requirements.max_wall_seconds:
+            return "max_wall_seconds_exceeded", exceeded_message, failed_action_ref
+        return None
 
     def _decide_permission(
         self,

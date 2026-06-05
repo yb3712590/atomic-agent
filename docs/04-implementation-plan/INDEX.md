@@ -25,6 +25,7 @@
 | `P0-005-command-policy-run-command-plan.md` | 2026-06-05 | 已实施 P0-005 command policy（命令策略）和 run_command（运行声明命令），保留为 TDD 实施记录 |
 | `P0-006-event-recorder-jsonl-plan.md` | 2026-06-05 | 已实施 P0-006 event recorder（事件记录器）和 JSONL event stream（JSONL 事件流），保留为 TDD 实施记录 |
 | `P0-007-minimal-agent-loop-plan.md` | 2026-06-05 | 已实施 P0-007 minimal AgentLoop（最小智能体循环），保留为 TDD 实施记录 |
+| `P0-008-fail-closed-budget-limits-plan.md` | 2026-06-05 | 已实施 P0-008 fail-closed budget limits（失败关闭预算限制），保留为 TDD 实施记录 |
 
 ## 5. Update Rules
 

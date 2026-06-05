@@ -27,7 +27,7 @@ P wave 完成后，必须先完成 roadmap review（路线图复审），再编�
 | P0-005 | 实现 command policy（命令策略）和 run_command | completed | `P0-005-command-policy-run-command-spec.md`, `mvp-runtime-spec.md` |
 | P0-006 | 实现 event recorder（事件记录器）和 JSONL 输出 | completed | `P0-006-event-recorder-jsonl-spec.md`, `event-stream-protocol.md` |
 | P0-007 | 实现最小 AgentLoop（智能体循环） | completed | `P0-007-minimal-agent-loop-spec.md`, `runtime-architecture.md` |
-| P0-008 | 实现 fail-closed budget limits（失败关闭预算限制） | pending | `mvp-acceptance.md` |
+| P0-008 | 实现 fail-closed budget limits（失败关闭预算限制） | completed | `P0-008-fail-closed-budget-limits-spec.md`, `mvp-acceptance.md` |
 
 ### P0 Exit Gate: Roadmap Review
 

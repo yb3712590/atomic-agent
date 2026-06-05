@@ -55,6 +55,22 @@ turn 5 -> submit_result
 - 超过 max steps。
 - observation 超长截断。
 
+## Permission Negative Gate
+
+P1-002 defines a focused permission negative gate（权限负向门禁）：
+
+```bash
+python -m pytest -m permission_negative -q
+```
+
+This gate covers fail-closed（失败关闭） behavior for path traversal（路径逃逸）、symlink escape（符号链接逃逸）、AllowedWriteSet（允许写入集合）、undeclared command（未声明命令）、free shell string（自由命令字符串）、network deny（网络拒绝）、missing network policy（缺失网络策略）、invalid provider JSON（无效模型 JSON）、unknown action（未知动作）、max steps（最大步数） and observation truncation（观察结果截断）.
+
+The gate is not a replacement for the full suite:
+
+```bash
+python -m pytest -q
+```
+
 ## Real Provider Tests
 
 真实 provider（模型供应商）集成测试只验证最小路径，不要求模型完成大型项目。

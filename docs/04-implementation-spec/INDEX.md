@@ -28,6 +28,7 @@
 | `P0-008-fail-closed-budget-limits-spec.md` | 2026-06-05 | 已实现 P0-008 fail-closed budget limits（失败关闭预算限制），保留为预算语义规格记录 |
 | `P0-exit-gate-roadmap-review-spec.md` | 2026-06-05 | 已完成 P0 Exit Gate（P0 退出门禁）路线图复审规格，保留为阶段门禁规格记录 |
 | `P1-001-web-fetch-network-policy-spec.md` | 2026-06-06 | 已实现 P1-001 web_fetch（网络获取）和 NetworkPolicy（网络策略），保留为网络工具规格记录 |
+| `P1-002-permission-negative-gate-spec.md` | 2026-06-06 | 已实现 P1-002 permission negative gate（权限负向门禁），保留为负向门禁规格记录 |
 
 ## 5. Update Rules
 

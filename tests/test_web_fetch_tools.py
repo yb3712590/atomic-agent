@@ -164,6 +164,7 @@ def test_network_policy_allows_matching_url():
     assert decision.reason == "network target allowed by rule docs"
 
 
+@pytest.mark.permission_negative
 @pytest.mark.parametrize(
     "url",
     [
@@ -189,6 +190,7 @@ def test_network_policy_denies_unmatched_or_invalid_url(url):
     assert decision.reason
 
 
+@pytest.mark.permission_negative
 def test_network_policy_empty_rules_denies_all():
     decision = NetworkPolicy(()).decide("https://example.com/docs")
 
@@ -265,6 +267,7 @@ def test_fetch_url_records_decode_replacement_for_non_utf8_body(local_http_serve
     assert result.data["body_decoded_with_replacement"] is True
 
 
+@pytest.mark.permission_negative
 def test_fetch_url_denies_unallowed_url_without_request(local_http_server):
     server, handler = local_http_server
     tools = WebFetchTools(

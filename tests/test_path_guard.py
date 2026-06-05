@@ -88,6 +88,7 @@ def test_resolve_read_path_rejects_absolute_paths(tmp_path, requested_path):
     assert decision.reason == "absolute_path_denied"
 
 
+@pytest.mark.permission_negative
 @pytest.mark.parametrize("requested_path", ["../outside.txt", "docs/../outside.txt"])
 def test_resolve_read_path_rejects_path_traversal(tmp_path, requested_path):
     guard = WorkspacePathGuard(tmp_path, allowed_write_set=[])
@@ -99,6 +100,7 @@ def test_resolve_read_path_rejects_path_traversal(tmp_path, requested_path):
     assert decision.reason == "path_escape_denied"
 
 
+@pytest.mark.permission_negative
 def test_resolve_read_path_rejects_symlink_escape(tmp_path):
     outside = tmp_path.parent / f"{tmp_path.name}-outside"
     outside.mkdir()
@@ -142,6 +144,7 @@ def test_resolve_write_path_allows_exact_allowed_file(tmp_path):
     assert decision.matched_policy == "docs/output.md"
 
 
+@pytest.mark.permission_negative
 def test_resolve_write_path_rejects_path_outside_allowed_write_set(tmp_path):
     guard = WorkspacePathGuard(tmp_path, allowed_write_set=["docs/output.md"])
 
@@ -191,6 +194,7 @@ def test_guard_rejects_invalid_allowed_write_set_entries(tmp_path, allowed_path)
         WorkspacePathGuard(tmp_path, allowed_write_set=[allowed_path])
 
 
+@pytest.mark.permission_negative
 def test_guard_rejects_allowed_write_set_symlink_escape(tmp_path):
     outside = tmp_path.parent / f"{tmp_path.name}-outside-policy"
     outside.mkdir()

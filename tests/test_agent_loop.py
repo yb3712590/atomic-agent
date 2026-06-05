@@ -1,6 +1,7 @@
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import subprocess
 import sys
 import threading
 
@@ -71,6 +72,32 @@ def make_web_fetch_tools(port, timeout_seconds=2.0):
     return WebFetchTools(
         NetworkPolicy((NetworkAllowRule("local-web", "http", "127.0.0.1", port, "/"),)),
         WebFetchToolConfig(timeout_seconds=timeout_seconds, max_response_bytes=4096),
+    )
+
+
+def create_escaping_directory_link(link: Path, target: Path):
+    try:
+        link.symlink_to(target, target_is_directory=True)
+        return
+    except OSError as error:
+        if sys.platform != "win32":
+            pytest.skip(f"symlink creation is unavailable: {error}")
+
+    subprocess.run(
+        [
+            "powershell",
+            "-NoProfile",
+            "-Command",
+            "New-Item",
+            "-ItemType",
+            "Junction",
+            "-Path",
+            str(link),
+            "-Target",
+            str(target),
+        ],
+        check=True,
+        stdout=subprocess.DEVNULL,
     )
 
 
@@ -216,6 +243,7 @@ def make_loop(tmp_path, provider, runtime_clock=None, web_fetch_tools=None):
 
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_fails_closed_when_budget_fields_are_missing(tmp_path):
     provider = ScriptedProvider([])
     loop, event_stream_path = make_loop(tmp_path, provider)
@@ -345,6 +373,7 @@ def test_agent_loop_records_auditable_event_stream_details(tmp_path):
     assert submission["artifact_refs"][0]["artifact_ref"].endswith("results/step-0005.json")
 
 
+@pytest.mark.permission_negative
 @pytest.mark.parametrize(
     ("name", "provider_outputs", "invocation_kwargs", "failure_kind", "failed_action_ref", "expected_event"),
     [
@@ -433,6 +462,7 @@ def test_agent_loop_fails_closed_for_runtime_errors(
     assert all(event["type"] != "run.completed" for event in events)
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_fails_closed_when_web_fetch_tools_are_not_configured(tmp_path):
     provider = ScriptedProvider([action("step-web", "web_fetch", {"url": "https://example.com/docs"})])
     loop, event_stream_path = make_loop(tmp_path, provider)
@@ -450,6 +480,7 @@ def test_agent_loop_fails_closed_when_web_fetch_tools_are_not_configured(tmp_pat
     assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_denies_unallowed_web_fetch_without_tool_attempt(tmp_path, local_http_server):
     server, handler = local_http_server
     provider = ScriptedProvider([action("step-web", "web_fetch", {"url": f"http://127.0.0.1:{server.server_port}/denied"})])
@@ -470,6 +501,149 @@ def test_agent_loop_denies_unallowed_web_fetch_without_tool_attempt(tmp_path, lo
     assert "tool.attempt.started" not in event_types
     assert "network.fetch.completed" not in event_types
     assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_denies_path_traversal_write_without_tool_attempt(tmp_path):
+    outside_target = tmp_path.parent / f"{tmp_path.name}-outside-agent-loop.txt"
+    provider = ScriptedProvider(
+        [action("step-escape", "write_file", {"path": f"../{outside_target.name}", "content": "secret"})]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "policy_denied"
+    assert result.failed_action_ref == "step-escape"
+    assert "path_escape_denied" in result.failure_message
+    assert not outside_target.exists()
+    assert result.tool_attempts == []
+    assert result.workspace_mutations == []
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
+    assert "tool.attempt.started" not in event_types
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_denies_symlink_escape_write_without_mutation(tmp_path):
+    outside = tmp_path.parent / f"{tmp_path.name}-outside-agent-loop"
+    outside.mkdir()
+    work = tmp_path / "work"
+    work.mkdir()
+    create_escaping_directory_link(work / "link", outside)
+    provider = ScriptedProvider(
+        [action("step-symlink", "write_file", {"path": "work/link/output.txt", "content": "secret"})]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+
+    result = loop.run(make_invocation(tmp_path))
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "policy_denied"
+    assert result.failed_action_ref == "step-symlink"
+    assert "symlink_escape_denied" in result.failure_message
+    assert not (outside / "output.txt").exists()
+    assert result.tool_attempts == []
+    assert result.workspace_mutations == []
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
+    assert "tool.attempt.started" not in event_types
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_rejects_unknown_action_and_fails_closed(tmp_path):
+    provider = ScriptedProvider(
+        [
+            json.dumps(
+                {
+                    "action_id": "step-unknown",
+                    "action": "delete_workspace",
+                    "reason_summary": "Delete the workspace.",
+                    "input": {"path": "."},
+                },
+                sort_keys=True,
+            )
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        budgets={
+            "max_steps": 3,
+            "max_parse_failures": 0,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "action_parse_failed"
+    assert result.failed_action_ref == "provider_turn_000001"
+    assert result.tool_attempts == []
+    assert result.workspace_mutations == []
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types == [
+        "run.started",
+        "provider.turn.started",
+        "provider.turn.completed",
+        "action.rejected",
+        "run.failed",
+    ]
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_truncates_oversized_observation_without_losing_artifact(tmp_path):
+    work = tmp_path / "work"
+    work.mkdir()
+    long_name = "very-long-file-name-that-forces-observation-truncation.txt"
+    (work / long_name).write_text("content", encoding="utf-8")
+    provider = ScriptedProvider(
+        [
+            action("step-list", "list_files", {"path": "work", "recursive": False}),
+            action(
+                "step-submit",
+                "submit_result",
+                {
+                    "summary": "Listed workspace files.",
+                    "produced_paths": [],
+                    "evidence_refs": ["step-list"],
+                },
+            ),
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    max_observation_chars = 48
+    invocation = make_invocation(
+        tmp_path,
+        tools=["list_files", "submit_result"],
+        budgets={
+            "max_steps": 2,
+            "max_parse_failures": 1,
+            "max_observation_chars": max_observation_chars,
+            "max_wall_seconds": 30.0,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.COMPLETED
+    assert len(provider.contexts) == 2
+    # Step 2 的 ProviderContext（模型上下文）在 submit_result（提交结果）解析前创建，只包含 step 1 的工具观察。
+    observation = provider.contexts[1].observations[-1]
+    assert observation["tool"] == "list_files"
+    assert observation["truncated"] is True
+    assert len(observation["visible"]) == max_observation_chars
+    assert observation["artifact"]["truncated_in_observation"] is True
+    artifact_path = tmp_path / "artifacts" / "observations" / "tool_attempt_000001.json"
+    artifact_payload = json.loads(artifact_path.read_text(encoding="utf-8"))
+    assert artifact_payload["data"]["entries"] == [
+        {"path": f"work/{long_name}", "kind": "file", "size": 7}
+    ]
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types[-2:] == ["result.submitted", "run.completed"]
 
 
 def test_agent_loop_records_network_fetch_completed_for_allowed_web_fetch(tmp_path, local_http_server):
@@ -532,6 +706,7 @@ def test_agent_loop_records_failed_tool_attempt_when_web_fetch_times_out(tmp_pat
     assert "network.fetch.completed" not in event_types
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_fails_closed_when_max_wall_seconds_is_missing(tmp_path):
     provider = ScriptedProvider([])
     loop, event_stream_path = make_loop(tmp_path, provider)
@@ -578,6 +753,7 @@ def test_agent_loop_fails_closed_when_max_wall_seconds_is_invalid(tmp_path, max_
     assert [event["type"] for event in events] == ["run.started", "run.failed"]
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_fails_closed_when_wall_time_exceeded_before_provider_turn(tmp_path):
     provider = ScriptedProvider([action("step-0001", "submit_result", {"summary": "Done", "produced_paths": [], "evidence_refs": []})])
     runtime_clock = FakeRuntimeClock([0.0, 31.0])
@@ -681,6 +857,7 @@ def test_agent_loop_fails_closed_when_runtime_clock_raises(tmp_path):
     assert [event["type"] for event in read_jsonl(event_stream_path)] == ["run.started", "run.failed"]
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_preserves_invalid_json_retry_limit_with_wall_budget(tmp_path):
     provider = ScriptedProvider(["not json", "still not json"])
     runtime_clock = FakeRuntimeClock([0.0] * 100)
@@ -705,6 +882,7 @@ def test_agent_loop_preserves_invalid_json_retry_limit_with_wall_budget(tmp_path
     assert event_types[-1] == "run.failed"
 
 
+@pytest.mark.permission_negative
 def test_agent_loop_preserves_max_steps_failure_with_wall_budget(tmp_path):
     (tmp_path / "work").mkdir()
     provider = ScriptedProvider([action("step-0001", "list_files", {"path": "work", "recursive": False})])

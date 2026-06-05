@@ -185,6 +185,7 @@ def test_list_files_rejects_file_path(tmp_path):
     assert result.data == {}
 
 
+@pytest.mark.permission_negative
 def test_list_files_rejects_path_escape(tmp_path):
     tools = make_tools(tmp_path)
 
@@ -382,6 +383,7 @@ def test_write_file_overwrites_exact_allowed_file_and_reports_before_hash(tmp_pa
     assert "+new" in result.data["diff"]
 
 
+@pytest.mark.permission_negative
 def test_write_file_rejects_path_outside_allowed_write_set(tmp_path):
     tools = make_tools(tmp_path, allowed_write_set=["generated/"])
 
@@ -469,6 +471,7 @@ def test_apply_patch_returns_not_found_for_missing_file(tmp_path):
     assert result.data == {}
 
 
+@pytest.mark.permission_negative
 def test_apply_patch_rejects_path_outside_allowed_write_set(tmp_path):
     target = tmp_path / "README.md"
     target.write_text("old\n", encoding="utf-8")
@@ -631,6 +634,7 @@ def test_list_files_does_not_recurse_into_symlink_directory(tmp_path):
     }
 
 
+@pytest.mark.permission_negative
 def test_write_file_rejects_symlink_escape_inside_allowed_directory(tmp_path):
     outside = tmp_path.parent / "outside-write"
     outside.mkdir()

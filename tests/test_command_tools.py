@@ -146,7 +146,11 @@ def test_command_policy_rejects_invalid_command_id(command_id):
         CommandSpec(argv=(str(PYTHON), "--version"), timeout_seconds=0.0),
         CommandSpec(argv=(str(PYTHON), "--version"), env={"": "value"}),
         CommandSpec(argv=(str(PYTHON), "--version"), env={"NAME": 123}),
-        CommandSpec(argv=(str(PYTHON), "--version"), allow_network=True),
+        pytest.param(
+            CommandSpec(argv=(str(PYTHON), "--version"), allow_network=True),
+            marks=pytest.mark.permission_negative,
+            id="networked_command_spec_denied",
+        ),
     ],
 )
 def test_command_policy_rejects_invalid_command_spec(spec):
@@ -234,6 +238,7 @@ def test_run_command_returns_completed_result_for_nonzero_exit_code(tmp_path):
     assert result.data["stderr"] == "failed"
 
 
+@pytest.mark.permission_negative
 def test_run_command_rejects_unknown_command_without_execution(tmp_path):
     tools = make_tools(tmp_path)
 
@@ -395,6 +400,7 @@ def test_execute_command_action_rejects_non_command_action(tmp_path):
     assert result.data == {}
 
 
+@pytest.mark.permission_negative
 def test_agent_action_still_rejects_run_command_shell_string():
     with pytest.raises(ValidationError):
         AgentAction(

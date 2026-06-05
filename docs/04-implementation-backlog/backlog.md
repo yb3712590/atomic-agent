@@ -47,7 +47,7 @@ Conclusion（结论）：
 | ID | Task | 状态 | 依据 |
 |---|---|---|---|
 | P1-001 | 实现 `web_fetch` 和 NetworkPolicy（网络策略） | completed | `P1-001-web-fetch-network-policy-spec.md`, `mvp-runtime-spec.md`, `agent-action-protocol.md`, `event-stream-protocol.md` |
-| P1-002 | 整合现有 permission negative tests（权限负向测试）为单一门禁，并补齐网络拒绝场景 | pending | `testing-strategy.md`, `mvp-acceptance.md`, `0003-use-fail-closed-permission-model.md` |
+| P1-002 | 整合现有 permission negative tests（权限负向测试）为单一门禁，并补齐网络拒绝场景 | completed | `P1-002-permission-negative-gate-spec.md`, `testing-strategy.md`, `mvp-acceptance.md`, `0003-use-fail-closed-permission-model.md` |
 | P1-003 | 固化 fake provider loop acceptance（假模型供应商循环验收）并建立真实 minimal example（最小示例）文档路径 | pending | `testing-strategy.md`, `mvp-acceptance.md`, `README.md` |
 | P1-004 | 实现 Boardroom AgentRuntimePort adapter（Boardroom 智能体运行时端口适配器） | pending | `agent-runtime-port.md`, `boardroom-os-integration-summary.md`, `0004-keep-boardroom-os-as-governance-source.md` |
 

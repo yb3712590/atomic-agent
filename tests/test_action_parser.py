@@ -37,6 +37,7 @@ def test_parse_agent_action_accepts_run_command_with_command_id():
     assert action.input == {"command_id": "test"}
 
 
+@pytest.mark.permission_negative
 def test_parse_agent_action_rejects_invalid_json():
     with pytest.raises(ActionParseError) as error:
         parse_agent_action("not json")
@@ -53,6 +54,7 @@ def test_parse_agent_action_rejects_non_object_json():
     assert "object" in error.value.message
 
 
+@pytest.mark.permission_negative
 def test_parse_agent_action_rejects_unknown_action():
     with pytest.raises(ActionParseError) as error:
         parse_agent_action(
@@ -86,6 +88,7 @@ def test_parse_agent_action_rejects_extra_envelope_fields():
     assert error.value.kind == "schema_validation_failed"
 
 
+@pytest.mark.permission_negative
 @pytest.mark.parametrize("forbidden_key", ["command", "shell", "cmd"])
 def test_parse_agent_action_rejects_run_command_shell_string(forbidden_key):
     with pytest.raises(ActionParseError) as error:
@@ -121,6 +124,7 @@ def test_parse_agent_action_accepts_web_fetch_with_url():
     assert action.input == {"url": "https://example.com/docs", "method": "GET"}
 
 
+@pytest.mark.permission_negative
 @pytest.mark.parametrize("input_payload", ["{}", "{\"url\": \"\"}", "{\"url\": \"https://example.com\", \"method\": \"POST\"}"])
 def test_parse_agent_action_rejects_invalid_web_fetch_input(input_payload):
     with pytest.raises(ActionParseError) as error:

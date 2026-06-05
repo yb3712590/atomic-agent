@@ -102,3 +102,37 @@ def test_parse_agent_action_rejects_run_command_shell_string(forbidden_key):
 
     assert error.value.kind == "schema_validation_failed"
     assert "command_id" in error.value.message
+
+
+
+def test_parse_agent_action_accepts_web_fetch_with_url():
+    action = parse_agent_action(
+        """
+        {
+          "action_id": "step-web",
+          "action": "web_fetch",
+          "reason_summary": "Fetch allowed documentation.",
+          "input": {"url": "https://example.com/docs", "method": "GET"}
+        }
+        """
+    )
+
+    assert action.action == AgentActionType.WEB_FETCH
+    assert action.input == {"url": "https://example.com/docs", "method": "GET"}
+
+
+@pytest.mark.parametrize("input_payload", ["{}", "{\"url\": \"\"}", "{\"url\": \"https://example.com\", \"method\": \"POST\"}"])
+def test_parse_agent_action_rejects_invalid_web_fetch_input(input_payload):
+    with pytest.raises(ActionParseError) as error:
+        parse_agent_action(
+            f"""
+            {{
+              "action_id": "step-web",
+              "action": "web_fetch",
+              "reason_summary": "Fetch documentation.",
+              "input": {input_payload}
+            }}
+            """
+        )
+
+    assert error.value.kind == "schema_validation_failed"

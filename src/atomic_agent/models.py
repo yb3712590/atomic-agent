@@ -78,6 +78,22 @@ class AgentAction(StrictModel):
             raise ValueError("run_command input requires command_id")
         return self
 
+    @model_validator(mode="after")
+    def web_fetch_uses_url_and_get(self):
+        if self.action != AgentActionType.WEB_FETCH:
+            return self
+        allowed_keys = {"url", "method"}
+        extra_keys = set(self.input) - allowed_keys
+        if extra_keys:
+            raise ValueError("web_fetch input only supports url and method")
+        url = self.input.get("url")
+        if not isinstance(url, str) or url == "":
+            raise ValueError("web_fetch input requires a non-empty url")
+        method = self.input.get("method", "GET")
+        if method != "GET":
+            raise ValueError("web_fetch input only supports method GET")
+        return self
+
 
 class AgentEvent(StrictModel):
     event_id: str

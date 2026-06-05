@@ -10,6 +10,7 @@ from atomic_agent.event_recorder import EventError, EventRecorder
 from atomic_agent.filesystem_tools import FileToolResult, FilesystemTools, execute_filesystem_action
 from atomic_agent.models import AgentAction, AgentActionType, AgentInvocation, AgentRunResult, AgentRunStatus
 from atomic_agent.path_guard import PathDecisionType
+from atomic_agent.web_fetch_tools import WebFetchToolResult, WebFetchTools, execute_web_fetch_action
 
 
 _FILESYSTEM_ACTIONS = {
@@ -47,6 +48,7 @@ class AgentLoopDependencies:
     event_recorder: EventRecorder
     artifact_writer: ArtifactWriter
     runtime_clock: Callable[[], float]
+    web_fetch_tools: WebFetchTools | None = None
 
 
 @dataclass(frozen=True)
@@ -298,7 +300,14 @@ class AgentLoop:
         if action.action.value not in invocation.tools:
             return PermissionDecision("deny", f"tool is not enabled: {action.action.value}", requirements.policy_ref)
         if action.action == AgentActionType.WEB_FETCH:
-            return PermissionDecision("deny", "web_fetch is not implemented in P0-007", requirements.policy_ref)
+            if self.dependencies.web_fetch_tools is None:
+                return PermissionDecision("deny", "web_fetch_tools dependency is not configured", requirements.policy_ref)
+            network_decision = self.dependencies.web_fetch_tools.policy.decide(action.input.get("url"))
+            return PermissionDecision(
+                network_decision.decision,
+                network_decision.reason,
+                requirements.policy_ref,
+            )
         if action.action in _MUTATING_FILESYSTEM_ACTIONS:
             requested_path = action.input.get("path")
             decision = self.dependencies.filesystem_tools.guard.resolve_write_path(requested_path)
@@ -312,11 +321,15 @@ class AgentLoop:
                 return PermissionDecision("deny", "command_id is not declared in command policy", requirements.policy_ref)
         return PermissionDecision("allow", "action allowed by invocation policy", requirements.policy_ref)
 
-    def _execute_tool_action(self, action: AgentAction) -> FileToolResult | CommandToolResult:
+    def _execute_tool_action(self, action: AgentAction) -> FileToolResult | CommandToolResult | WebFetchToolResult:
         if action.action in _FILESYSTEM_ACTIONS:
             return execute_filesystem_action(action, self.dependencies.filesystem_tools)
         if action.action == AgentActionType.RUN_COMMAND:
             return execute_command_action(action, self.dependencies.command_tools)
+        if action.action == AgentActionType.WEB_FETCH:
+            if self.dependencies.web_fetch_tools is None:
+                raise AgentLoopError("web_fetch_tools dependency is not configured")
+            return execute_web_fetch_action(action, self.dependencies.web_fetch_tools)
         raise AgentLoopError(f"unsupported executable action: {action.action.value}")
 
     def _record_tool_result(
@@ -325,7 +338,7 @@ class AgentLoop:
         requirements: _RuntimeRequirements,
         action: AgentAction,
         tool_attempt_id: str,
-        result: FileToolResult | CommandToolResult,
+        result: FileToolResult | CommandToolResult | WebFetchToolResult,
     ) -> None:
         observation_document = self._tool_result_payload(result)
         visible, truncated = self._visible_observation(observation_document, requirements.max_observation_chars)
@@ -368,6 +381,7 @@ class AgentLoop:
             )
             self._record_workspace_mutation_if_needed(state, action, tool_attempt_id, result)
             self._record_command_completed_if_needed(state, tool_attempt_id, result)
+            self._record_network_fetch_completed_if_needed(state, tool_attempt_id, result)
             return
 
         self.dependencies.event_recorder.record_tool_attempt_failed(
@@ -387,7 +401,7 @@ class AgentLoop:
         state: _RunState,
         action: AgentAction,
         tool_attempt_id: str,
-        result: FileToolResult | CommandToolResult,
+        result: FileToolResult | CommandToolResult | WebFetchToolResult,
     ) -> None:
         if not isinstance(result, FileToolResult) or action.action not in _MUTATING_FILESYSTEM_ACTIONS:
             return
@@ -420,7 +434,7 @@ class AgentLoop:
         self,
         state: _RunState,
         tool_attempt_id: str,
-        result: FileToolResult | CommandToolResult,
+        result: FileToolResult | CommandToolResult | WebFetchToolResult,
     ) -> None:
         if not isinstance(result, CommandToolResult):
             return
@@ -443,6 +457,27 @@ class AgentLoop:
             stderr_artifact,
         )
 
+    def _record_network_fetch_completed_if_needed(
+        self,
+        state: _RunState,
+        tool_attempt_id: str,
+        result: FileToolResult | CommandToolResult | WebFetchToolResult,
+    ) -> None:
+        if not isinstance(result, WebFetchToolResult):
+            return
+        response_artifact = self.dependencies.artifact_writer.write_json(
+            f"web_fetch/{tool_attempt_id}.response.json",
+            result.data,
+            truncated_in_observation=result.data["body_truncated"],
+        )
+        state.artifacts.append(response_artifact)
+        self.dependencies.event_recorder.record_network_fetch_completed(
+            tool_attempt_id,
+            result.url or result.data["url"],
+            result.data["status_code"],
+            response_artifact,
+        )
+
     def _step_from_tool_attempt_id(self, tool_attempt_id: str) -> int:
         prefix = "tool_attempt_"
         if not tool_attempt_id.startswith(prefix):
@@ -452,7 +487,7 @@ class AgentLoop:
         except ValueError as error:
             raise AgentLoopError("tool_attempt_id step must be an integer") from error
 
-    def _tool_result_payload(self, result: FileToolResult | CommandToolResult) -> dict[str, Any]:
+    def _tool_result_payload(self, result: FileToolResult | CommandToolResult | WebFetchToolResult) -> dict[str, Any]:
         payload = {
             "ok": result.ok,
             "tool": result.tool,
@@ -462,6 +497,8 @@ class AgentLoop:
             payload["path"] = result.path
         if isinstance(result, CommandToolResult):
             payload["command_id"] = result.command_id
+        if isinstance(result, WebFetchToolResult):
+            payload["url"] = result.url
         if not result.ok:
             payload["error_kind"] = result.error_kind
             payload["error_message"] = result.error_message

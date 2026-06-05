@@ -1,6 +1,8 @@
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import sys
+import threading
 
 import pytest
 
@@ -11,9 +13,65 @@ from atomic_agent.event_recorder import EventRecorder, EventRecorderConfig
 from atomic_agent.filesystem_tools import FilesystemToolConfig, FilesystemTools
 from atomic_agent.models import AgentInvocation, AgentRunStatus
 from atomic_agent.path_guard import WorkspacePathGuard
+from atomic_agent.web_fetch_tools import NetworkAllowRule, NetworkPolicy, WebFetchToolConfig, WebFetchTools
 
 
 PYTHON = Path(sys.executable).resolve()
+
+
+class RecordingHandler(BaseHTTPRequestHandler):
+    response_status = 200
+    response_reason = "OK"
+    response_body = b"ok"
+    response_content_type = "text/plain; charset=utf-8"
+    delay_seconds = 0.0
+    request_paths = []
+
+    def do_GET(self):
+        if self.delay_seconds:
+            import time
+
+            time.sleep(self.delay_seconds)
+        self.__class__.request_paths.append(self.path)
+        self.send_response(self.response_status, self.response_reason)
+        if self.response_content_type is not None:
+            self.send_header("Content-Type", self.response_content_type)
+        self.end_headers()
+        try:
+            self.wfile.write(self.response_body)
+        except BrokenPipeError:
+            pass
+
+    def log_message(self, format, *args):
+        return
+
+
+@pytest.fixture
+def local_http_server():
+    class Handler(RecordingHandler):
+        response_status = 200
+        response_reason = "OK"
+        response_body = b"ok"
+        response_content_type = "text/plain; charset=utf-8"
+        delay_seconds = 0.0
+        request_paths = []
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server, Handler
+    finally:
+        server.shutdown()
+        thread.join(timeout=2.0)
+        server.server_close()
+
+
+def make_web_fetch_tools(port, timeout_seconds=2.0):
+    return WebFetchTools(
+        NetworkPolicy((NetworkAllowRule("local-web", "http", "127.0.0.1", port, "/"),)),
+        WebFetchToolConfig(timeout_seconds=timeout_seconds, max_response_bytes=4096),
+    )
 
 
 class ScriptedProvider:
@@ -92,7 +150,7 @@ def make_invocation(tmp_path, tools=None, budgets=None, allowed_write_set=None):
     )
 
 
-def make_loop(tmp_path, provider, runtime_clock=None):
+def make_loop(tmp_path, provider, runtime_clock=None, web_fetch_tools=None):
     event_dir = tmp_path / "events"
     event_dir.mkdir()
     artifact_dir = tmp_path / "artifacts"
@@ -147,6 +205,7 @@ def make_loop(tmp_path, provider, runtime_clock=None):
             provider=provider,
             filesystem_tools=filesystem_tools,
             command_tools=command_tools,
+            web_fetch_tools=web_fetch_tools,
             event_recorder=recorder,
             artifact_writer=artifact_writer,
             runtime_clock=runtime_clock,
@@ -322,7 +381,7 @@ def test_agent_loop_records_auditable_event_stream_details(tmp_path):
             "permission.decided",
         ),
         (
-            "web_fetch_not_implemented",
+            "web_fetch_tools_not_configured",
             [action("step-web", "web_fetch", {"url": "https://example.com"})],
             {"tools": ["web_fetch", "submit_result"]},
             "policy_denied",
@@ -372,6 +431,105 @@ def test_agent_loop_fails_closed_for_runtime_errors(
     assert events[-1]["payload"]["error"]["kind"] == failure_kind
     assert expected_event in [event["type"] for event in events]
     assert all(event["type"] != "run.completed" for event in events)
+
+
+def test_agent_loop_fails_closed_when_web_fetch_tools_are_not_configured(tmp_path):
+    provider = ScriptedProvider([action("step-web", "web_fetch", {"url": "https://example.com/docs"})])
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(tmp_path, tools=["web_fetch", "submit_result"])
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "policy_denied"
+    assert result.failed_action_ref == "step-web"
+    assert "web_fetch_tools" in result.failure_message
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert "tool.attempt.started" not in event_types
+    assert "network.fetch.completed" not in event_types
+    assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
+
+
+def test_agent_loop_denies_unallowed_web_fetch_without_tool_attempt(tmp_path, local_http_server):
+    server, handler = local_http_server
+    provider = ScriptedProvider([action("step-web", "web_fetch", {"url": f"http://127.0.0.1:{server.server_port}/denied"})])
+    tools = WebFetchTools(
+        NetworkPolicy((NetworkAllowRule("allowed-only", "http", "127.0.0.1", server.server_port, "/allowed"),)),
+        WebFetchToolConfig(timeout_seconds=2.0, max_response_bytes=4096),
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider, web_fetch_tools=tools)
+    invocation = make_invocation(tmp_path, tools=["web_fetch", "submit_result"])
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "policy_denied"
+    assert result.failed_action_ref == "step-web"
+    assert handler.request_paths == []
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert "tool.attempt.started" not in event_types
+    assert "network.fetch.completed" not in event_types
+    assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
+
+
+def test_agent_loop_records_network_fetch_completed_for_allowed_web_fetch(tmp_path, local_http_server):
+    server, handler = local_http_server
+    handler.response_body = b"agent loop body"
+    provider = ScriptedProvider(
+        [
+            action("step-web", "web_fetch", {"url": f"http://127.0.0.1:{server.server_port}/docs"}),
+            action(
+                "step-submit",
+                "submit_result",
+                {
+                    "summary": "Fetched allowed URL.",
+                    "produced_paths": [],
+                    "evidence_refs": ["step-web"],
+                },
+            ),
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider, web_fetch_tools=make_web_fetch_tools(server.server_port))
+    invocation = make_invocation(tmp_path, tools=["web_fetch", "submit_result"])
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.COMPLETED
+    assert handler.request_paths == ["/docs"]
+    assert result.tool_attempts[0]["tool"] == "web_fetch"
+    assert result.tool_attempts[0]["ok"] is True
+    events = read_jsonl(event_stream_path)
+    event_types = [event["type"] for event in events]
+    assert "network.fetch.completed" in event_types
+    network_event = next(event for event in events if event["type"] == "network.fetch.completed")
+    assert network_event["payload"]["tool_attempt_id"] == "tool_attempt_000001"
+    assert network_event["payload"]["url"] == f"http://127.0.0.1:{server.server_port}/docs"
+    assert network_event["payload"]["status_code"] == 200
+    assert network_event["payload"]["response"]["artifact_ref"].endswith("web_fetch/tool_attempt_000001.response.json")
+
+
+def test_agent_loop_records_failed_tool_attempt_when_web_fetch_times_out(tmp_path, local_http_server):
+    server, handler = local_http_server
+    handler.delay_seconds = 0.3
+    provider = ScriptedProvider([action("step-web", "web_fetch", {"url": f"http://127.0.0.1:{server.server_port}/slow"})])
+    loop, event_stream_path = make_loop(
+        tmp_path,
+        provider,
+        web_fetch_tools=make_web_fetch_tools(server.server_port, timeout_seconds=0.05),
+    )
+    invocation = make_invocation(tmp_path, tools=["web_fetch", "submit_result"])
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "tool_failed"
+    assert result.failed_action_ref == "step-web"
+    assert result.tool_attempts[0]["tool"] == "web_fetch"
+    assert result.tool_attempts[0]["ok"] is False
+    assert result.tool_attempts[0]["error_kind"] == "timeout"
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert event_types[-3:] == ["tool.attempt.started", "tool.attempt.failed", "run.failed"]
+    assert "network.fetch.completed" not in event_types
 
 
 def test_agent_loop_fails_closed_when_max_wall_seconds_is_missing(tmp_path):

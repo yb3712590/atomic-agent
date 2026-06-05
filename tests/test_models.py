@@ -168,3 +168,51 @@ def test_agent_action_accepts_run_command_with_command_id():
     )
 
     assert action.input == {"command_id": "test"}
+
+
+
+def test_agent_action_accepts_web_fetch_with_url_only():
+    action = AgentAction(
+        action_id="step-web",
+        action="web_fetch",
+        reason_summary="Fetch allowed documentation.",
+        input={"url": "https://example.com/docs"},
+    )
+
+    assert action.action == AgentActionType.WEB_FETCH
+    assert action.input == {"url": "https://example.com/docs"}
+
+
+
+def test_agent_action_accepts_web_fetch_with_get_method():
+    action = AgentAction(
+        action_id="step-web",
+        action="web_fetch",
+        reason_summary="Fetch allowed documentation.",
+        input={"url": "https://example.com/docs", "method": "GET"},
+    )
+
+    assert action.input == {"url": "https://example.com/docs", "method": "GET"}
+
+
+@pytest.mark.parametrize(
+    "input_payload",
+    [
+        {},
+        {"url": ""},
+        {"url": 123},
+        {"url": "https://example.com/docs", "method": "POST"},
+        {"url": "https://example.com/docs", "method": 123},
+        {"url": "https://example.com/docs", "headers": {"Accept": "text/plain"}},
+        {"url": "https://example.com/docs", "body": "payload"},
+        {"url": "https://example.com/docs", "timeout": 1},
+    ],
+)
+def test_agent_action_rejects_invalid_web_fetch_input(input_payload):
+    with pytest.raises(ValidationError):
+        AgentAction(
+            action_id="step-web",
+            action="web_fetch",
+            reason_summary="Fetch documentation.",
+            input=input_payload,
+        )

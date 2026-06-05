@@ -26,6 +26,7 @@
 | `P0-006-event-recorder-jsonl-plan.md` | 2026-06-05 | 已实施 P0-006 event recorder（事件记录器）和 JSONL event stream（JSONL 事件流），保留为 TDD 实施记录 |
 | `P0-007-minimal-agent-loop-plan.md` | 2026-06-05 | 已实施 P0-007 minimal AgentLoop（最小智能体循环），保留为 TDD 实施记录 |
 | `P0-008-fail-closed-budget-limits-plan.md` | 2026-06-05 | 已实施 P0-008 fail-closed budget limits（失败关闭预算限制），保留为 TDD 实施记录 |
+| `P0-exit-gate-roadmap-review-plan.md` | 2026-06-05 | 已实施 P0 Exit Gate（P0 退出门禁）路线图复审和 P1 工作包滚动更新，保留为阶段门禁实施记录 |
 
 ## 5. Update Rules
 

@@ -31,27 +31,31 @@ P wave 完成后，必须先完成 roadmap review（路线图复审），再编�
 
 ### P0 Exit Gate: Roadmap Review
 
-Trigger（触发条件）：
+Status（状态）：completed
 
-- P0 表中所有非 deferred（延后）任务均为 completed。
-- P0 相关 tests（测试）、acceptance（验收）和 docs（文档）已验证。
+Review record（复审记录）：`docs/07-project-log/2026-06-05-P0-exit-review.md`
 
-Required outputs（必需产物）：
+Conclusion（结论）：
 
-1. 对照 `docs/06-roadmap/roadmap.md` 的 milestone exit criteria（里程碑退出标准），判断 M1/M2 哪些条目已满足、部分满足或失效。
-2. 记录当前 P0 完成项是否改变下一阶段优先级。
-3. 编制或重组 P1 execution wave（执行波次）。
-4. 如长期路线、项目边界或架构原则变化，先新增或更新 ADR。
-5. 必要时写入 `docs/07-project-log/`（项目日志）。
+- M1 exit criteria（M1 退出标准）已满足。
+- M2 已部分满足：`run_command`（运行声明命令）、预算和无效动作 fail closed（失败关闭）已完成；`web_fetch`（网络获取）、NetworkPolicy（网络策略）和完整 permission negative tests（权限负向测试）仍需进入 P1。
+- M3 尚未开始：Boardroom `AgentRuntimePort adapter`（智能体运行时端口适配器）仍需进入 P1 后段。
+- README minimal example（最小示例）仍需在真实 CLI command（命令行命令）可运行、产生 JSONL event stream（JSONL 事件流）且演示成功 fake provider loop（假模型供应商循环）后更新；不得用伪命令或 mock success path（模拟成功路径）替代。
 
 ## P1: Integration and Network
 
 | ID | Task | 状态 | 依据 |
 |---|---|---|---|
-| P1-001 | 实现 web_fetch 和 NetworkPolicy（网络策略） | pending | `mvp-runtime-spec.md` |
-| P1-002 | 实现 Boardroom AgentRuntimePort adapter（Boardroom 智能体运行时端口适配器） | pending | `agent-runtime-port.md` |
-| P1-003 | 实现 fake provider loop tests（假模型供应商循环测试） | pending | `testing-strategy.md` |
-| P1-004 | 实现 permission negative tests（权限负向测试） | pending | `testing-strategy.md` |
+| P1-001 | 实现 `web_fetch` 和 NetworkPolicy（网络策略） | pending | `mvp-runtime-spec.md`, `agent-action-protocol.md`, `event-stream-protocol.md` |
+| P1-002 | 整合现有 permission negative tests（权限负向测试）为单一门禁，并补齐网络拒绝场景 | pending | `testing-strategy.md`, `mvp-acceptance.md`, `0003-use-fail-closed-permission-model.md` |
+| P1-003 | 固化 fake provider loop acceptance（假模型供应商循环验收）并建立真实 minimal example（最小示例）文档路径 | pending | `testing-strategy.md`, `mvp-acceptance.md`, `README.md` |
+| P1-004 | 实现 Boardroom AgentRuntimePort adapter（Boardroom 智能体运行时端口适配器） | pending | `agent-runtime-port.md`, `boardroom-os-integration-summary.md`, `0004-keep-boardroom-os-as-governance-source.md` |
+
+Dependency notes（依赖说明）：
+
+- P1-002 depends on P1-001 for network deny（网络拒绝） coverage; it should inventory and consolidate existing P0 negative tests instead of rewriting already-covered scenarios.
+- P1-003 depends on the existing P0 AgentLoop（智能体循环） and may expose an entrypoint/docs gap; it must not publish a README command until a real CLI command runs successfully, produces JSONL event stream（JSONL 事件流）, and demonstrates at least one successful fake provider loop（假模型供应商循环）.
+- P1-004 should run after P1-001 to P1-003 stabilize runtime evidence semantics（运行时证据语义）.
 
 ### P1 Exit Gate: Roadmap Review
 

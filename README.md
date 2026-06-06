@@ -36,21 +36,43 @@ boardroom-os
 
 ## 3. 如何运行最小示例
 
-当前仓库处于 M0 文档与契约初始化阶段，尚未实现可运行的 minimal example（最小示例）。因此现在没有真实的示例命令可以运行；不要用 mock success path（模拟成功路径）或伪命令表示示例已可用。
+当前仓库提供一个 deterministic fake provider loop（确定性假模型供应商循环）作为 minimal example（最小示例）。它不证明真实模型能力；它用于证明 `AgentLoop`（智能体循环）会真实执行受控工具、记录 JSONL event stream（JSONL 事件流）、写入 artifact（产物），并输出 `AgentRunResult`（智能体运行结果）。
 
-当前可执行的仓库健康检查只有：
+从仓库根目录运行：
 
 ```bash
-git status --short
+rm -rf /tmp/atomic-agent-minimal-example
+PYTHONPATH=src python -m atomic_agent.examples.minimal_fake_loop \
+  --run-id minimal_example \
+  --workspace /tmp/atomic-agent-minimal-example/workspace \
+  --event-stream /tmp/atomic-agent-minimal-example/events/events.jsonl \
+  --artifact-root /tmp/atomic-agent-minimal-example/artifacts \
+  --result /tmp/atomic-agent-minimal-example/result.json
 ```
 
-当 minimal example（最小示例）实现后，本节必须更新为真实命令，并同步更新：
+成功时 stdout（标准输出）是 JSON：
 
-- `docs/INDEX.md`（文档总索引）
-- `docs/04-implementation-acceptance/INDEX.md`（实现验收索引）
-- `docs/05-testing/INDEX.md`（测试索引）
+```json
+{"artifact_root": "/tmp/atomic-agent-minimal-example/artifacts", "event_stream_path": "/tmp/atomic-agent-minimal-example/events/events.jsonl", "result_path": "/tmp/atomic-agent-minimal-example/result.json", "status": "completed", "workspace_output_path": "/tmp/atomic-agent-minimal-example/workspace/work/output.txt"}
+```
 
-未来示例命令必须满足：真实执行、真实退出码、真实事件输出；不得以静态文本、模拟结果或 silent fallback（静默降级）伪装成功。
+该示例的真实执行路径是：
+
+1. fake provider（假模型供应商）请求 `write_file`（写文件），写入 `work/output.txt = draft`。
+2. fake provider 请求 `run_command`（运行声明命令）执行 `check-output`，命令真实返回 exit code `3`。
+3. command result（命令结果）作为 observation（观察结果）进入下一轮。
+4. fake provider 请求 `apply_patch`（应用补丁），将 `draft` 修复为 `fixed`。
+5. fake provider 再次请求 `run_command`，命令真实返回 exit code `0`。
+6. fake provider 请求 `submit_result`（提交结果），runtime 写出 `AgentRunResult`（智能体运行结果）。
+
+可检查的输出包括：
+
+- `/tmp/atomic-agent-minimal-example/result.json`：结构化 `AgentRunResult`。
+- `/tmp/atomic-agent-minimal-example/events/events.jsonl`：JSONL event stream（JSONL 事件流）。
+- `/tmp/atomic-agent-minimal-example/artifacts/`：provider output（模型输出）、observation（观察结果）、diff（差异）、command stdout/stderr（命令输出）和 result artifact（结果产物）。
+- `/tmp/atomic-agent-minimal-example/workspace/work/output.txt`：最终内容为 `fixed`。
+
+该示例仍必须满足：真实执行、真实退出码、真实事件输出；不得以静态文本、模拟结果或 silent fallback（静默降级）伪装成功。
 
 ## 4. 文档入口在哪里
 

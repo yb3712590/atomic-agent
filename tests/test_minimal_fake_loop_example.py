@@ -5,6 +5,9 @@ import re
 import subprocess
 import sys
 
+from atomic_agent.evidence import build_evidence_summary
+from atomic_agent.models import AgentRunResult
+
 
 PYTHON = Path(sys.executable).resolve()
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -123,6 +126,23 @@ def test_minimal_fake_loop_example_runs_real_multistep_loop(tmp_path):
         paths["artifact_root"] / "results" / "step-0005.json",
     ]
     assert all(path.exists() for path in expected_artifacts)
+
+    evidence_summary = build_evidence_summary(
+        AgentRunResult.model_validate(result_payload),
+        paths["event_stream"],
+    )
+    assert evidence_summary["event_stream"]["integrity"]["ok"] is True
+    assert [command["exit_code"] for command in evidence_summary["command_results"]] == [3, 0]
+    assert all(command["stdout"]["sha256"].startswith("sha256:") for command in evidence_summary["command_results"])
+    assert all(command["stderr"]["sha256"].startswith("sha256:") for command in evidence_summary["command_results"])
+    assert evidence_summary["source_inventory_lineage"]
+    assert evidence_summary["source_inventory_lineage"][0]["path"] == "work/output.txt"
+    assert evidence_summary["source_inventory_lineage"][0]["lineage_status"] == "traceable"
+    assert [mutation["tool"] for mutation in evidence_summary["source_inventory_lineage"][0]["mutation_refs"]] == [
+        "write_file",
+        "apply_patch",
+    ]
+    assert evidence_summary["replay"]["status"] == "not_replayable"
 
 
 def test_minimal_fake_loop_expands_tilde_paths(tmp_path):

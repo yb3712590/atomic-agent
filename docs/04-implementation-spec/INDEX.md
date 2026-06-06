@@ -32,6 +32,7 @@
 | `P1-003-fake-provider-loop-minimal-example-spec.md` | 2026-06-06 | 已实现 P1-003 fake provider loop acceptance（假模型供应商循环验收）和 minimal example（最小示例），保留为示例验收规格记录 |
 | `P1-004-boardroom-agent-runtime-port-adapter-spec.md` | 2026-06-06 | 已实现 P1-004 Boardroom AgentRuntimePort adapter（Boardroom 智能体运行时端口适配器），保留为端口适配器规格记录 |
 | `P1-exit-gate-roadmap-review-spec.md` | 2026-06-07 | 已完成 P1 Exit Gate（P1 退出门禁）路线图复审规格，保留为阶段门禁规格记录 |
+| `P2-001-evidence-mapping-artifact-hash-hardening-spec.md` | 2026-06-07 | 已实现 P2-001 event stream / evidence mapping（事件流 / 证据映射）和 artifact hash（产物哈希）硬化，保留为证据映射规格记录 |
 
 ## 5. Update Rules
 

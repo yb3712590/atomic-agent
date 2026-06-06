@@ -59,26 +59,32 @@ Dependency notes（依赖说明）：
 
 ### P1 Exit Gate: Roadmap Review
 
-Trigger（触发条件）：
+Status（状态）：completed
 
-- P1 表中所有非 deferred（延后）任务均为 completed。
-- P1 相关 integration（集成）、negative tests（负向测试）和 docs（文档）已验证。
+Review record（复审记录）：`docs/07-project-log/2026-06-07-P1-exit-review.md`
 
-Required outputs（必需产物）：
+Conclusion（结论）：
 
-1. 对照 `docs/06-roadmap/roadmap.md`，判断 M1/M2/M3 哪些条目已满足、部分满足或失效。
-2. 明确 real provider integration tests（真实模型供应商集成测试）是否需要进入下一 P wave。
-3. 编制或重组 P2 execution wave（执行波次）。
-4. 如 Boardroom OS（Boardroom 操作系统）对接边界或 evidence（证据）模型变化，先新增或更新 ADR。
-5. 必要时写入 `docs/07-project-log/`。
+- M1 exit criteria（M1 退出标准）已满足。
+- M2 exit criteria（M2 退出标准）已满足：`run_command`（运行声明命令）、`web_fetch`（网络获取）、NetworkPolicy（网络策略）、permission negative gate（权限负向门禁）、预算和无效动作 fail closed（失败关闭）均已有验证路径。
+- M3 exit criteria（M3 退出标准）已满足：Boardroom `AgentRuntimePort adapter`（智能体运行时端口适配器）已实现，并保持 atomic-agent 不声明 Boardroom governance completion（治理完成）的边界。
+- M4 尚未完成：event stream / evidence mapping（事件流 / 证据映射）、artifact hash（产物哈希）和 SourceInventory（源码清单） lineage（谱系）应成为 P2 优先工作包。
+- M5 尚未开始：external coding agent bridge（外部编码智能体桥接）继续 deferred（延后），直到 M4 证据导入路径稳定。
 
-## P2: Later Extensions
+## P2: Evidence Mapping and Integration Gates
 
 | ID | Task | 状态 | 依据 |
 |---|---|---|---|
-| P2-001 | native tool calling adapter（原生工具调用适配器） | deferred | ADR-0002 |
-| P2-002 | service runner / http probe（服务运行与 HTTP 探测） | deferred | roadmap |
-| P2-003 | external coding agent bridge（外部编码智能体桥接） | deferred | roadmap |
+| P2-001 | 完善 event stream / evidence mapping（事件流 / 证据映射）和 artifact hash（产物哈希）硬化 | pending | `event-stream-protocol.md`, `event-and-evidence-architecture.md`, `agent-runtime-port.md`, `mvp-acceptance.md`, `roadmap.md` |
+| P2-002 | 建立 real provider minimal integration gate（真实模型供应商最小集成门禁） | pending | `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
+| P2-003 | 设计 external coding agent bridge（外部编码智能体桥接）的证据导入协议和权限边界 | deferred | `roadmap.md`, `0002-use-provider-agnostic-action-protocol.md`, `0003-use-fail-closed-permission-model.md` |
+
+Dependency notes（依赖说明）：
+
+- P2-001 is the first P2 work package because M4 evidence mapping（证据映射） must be hardened before expanding to external coding agent bridge（外部编码智能体桥接）.
+- P2-002 should run after or alongside P2-001 only as a manual/nightly or integration-profile gate（集成配置门禁）; it must not destabilize base CI（基础持续集成）.
+- P2-003 remains deferred; it should produce a design spec（设计规格） or ADR（架构决策记录） for evidence import protocol（证据导入协议） and permission boundary（权限边界） before any bridge implementation.
+- Earlier deferred ideas such as native tool calling adapter（原生工具调用适配器） and service runner / HTTP probe（服务运行与 HTTP 探测） are not removed from the roadmap; they are not part of the immediate P2 batch unless a later roadmap review re-prioritizes them.
 
 ### P2 Exit Gate: Roadmap Review
 

@@ -143,8 +143,10 @@ class OpenAICompatibleProviderAdapter:
 
     def _content_from_chunk(self, chunk: Any) -> str:
         choices = getattr(chunk, "choices", None)
-        if not isinstance(choices, list) or not choices:
-            raise OpenAICompatibleProviderError("stream chunk choices must not be empty")
+        if not isinstance(choices, list):
+            raise OpenAICompatibleProviderError("stream chunk choices must be a list")
+        if not choices:
+            return ""
         choice = choices[0]
         finish_reason = getattr(choice, "finish_reason", None)
         if finish_reason == "length":

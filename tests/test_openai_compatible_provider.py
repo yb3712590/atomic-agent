@@ -190,10 +190,18 @@ def test_adapter_includes_observations_without_api_key():
     assert "secret-key" not in serialized
 
 
-def test_adapter_rejects_empty_choices_chunk():
+def test_adapter_skips_empty_choices_chunks_as_stream_heartbeats():
+    client = FakeOpenAIClient(chunks=[empty_choices_chunk(), chunk(VALID_ACTION_TEXT)])
+
+    output = adapter(client).complete(provider_context())
+
+    assert output == VALID_ACTION_TEXT
+
+
+def test_adapter_rejects_stream_with_only_empty_choices_chunks():
     client = FakeOpenAIClient(chunks=[empty_choices_chunk()])
 
-    with pytest.raises(OpenAICompatibleProviderError, match="stream chunk choices must not be empty"):
+    with pytest.raises(OpenAICompatibleProviderError, match="provider stream completed without content"):
         adapter(client).complete(provider_context())
 
 

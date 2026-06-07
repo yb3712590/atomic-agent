@@ -25,4 +25,5 @@ testpaths = ["tests"]
 markers = [
   "permission_negative: fail-closed permission and security boundary tests",
   "real_provider: OpenAI-compatible real provider integration tests; skipped unless ATOMIC_AGENT_RUN_REAL_PROVIDER=1",
+  "real_provider_tool_success: success-only OpenAI-compatible real provider tool integration tests; skipped unless ATOMIC_AGENT_RUN_REAL_PROVIDER_TOOL_SUCCESS=1",
 ]

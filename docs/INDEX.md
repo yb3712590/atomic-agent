@@ -44,8 +44,8 @@
 | P0 | `docs/03-contracts/agent-action-protocol.md` | active | 修改动作协议或工具集合前 |
 | P0 | `docs/03-contracts/event-stream-protocol.md` | active | 修改事件协议前 |
 | P0 | `docs/04-implementation-spec/mvp-runtime-spec.md` | active | 定义 MVP runtime（最小可行运行时）实现范围时 |
-| P2 | `docs/04-implementation-spec/P2-004-real-provider-tool-success-gate-spec.md` | draft | 实施 P2-004 real provider tool success gate（真实供应商工具成功门禁）前 |
-| P2 | `docs/04-implementation-plan/P2-004-real-provider-tool-success-gate-plan.md` | draft | 执行 P2-004 real provider tool success gate（真实供应商工具成功门禁）前 |
+| P2 | `docs/04-implementation-spec/P2-005-openai-compatible-provider-options-hardening-spec.md` | draft | 细化或实施 P2-005 OpenAI-compatible provider options hardening（OpenAI 兼容供应商参数硬化）前 |
+| P2 | `docs/04-implementation-spec/P2-006-complex-real-provider-atomic-task-gate-spec.md` | draft | 细化或实施 P2-006 complex real provider atomic task gate（复杂真实供应商原子任务门禁）前 |
 | P0 | `docs/04-implementation-backlog/backlog.md` | active | 领取或调整实现任务前 |
 | P0 | `docs/04-implementation-acceptance/mvp-acceptance.md` | active | 判断 MVP 是否完成前 |
 | P1 | `docs/05-testing/testing-strategy.md` | active | 增加或修改测试策略前 |

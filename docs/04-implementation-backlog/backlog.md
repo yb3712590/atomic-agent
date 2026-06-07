@@ -78,7 +78,9 @@ Conclusion（结论）：
 | P2-001 | 完善 event stream / evidence mapping（事件流 / 证据映射）和 artifact hash（产物哈希）硬化 | completed | `P2-001-evidence-mapping-artifact-hash-hardening-spec.md`, `event-stream-protocol.md`, `event-and-evidence-architecture.md`, `agent-runtime-port.md`, `mvp-acceptance.md`, `roadmap.md` |
 | P2-002 | 建立 real provider minimal integration gate（真实模型供应商最小集成门禁） | completed | `P2-002-real-provider-minimal-integration-gate-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
 | P2-003 | 设计 external coding agent bridge（外部编码智能体桥接）的证据导入协议和权限边界 | deferred | `roadmap.md`, `0002-use-provider-agnostic-action-protocol.md`, `0003-use-fail-closed-permission-model.md` |
-| P2-004 | 建立 real provider tool success gate（真实供应商工具成功门禁） | pending | `P2-004-real-provider-tool-success-gate-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
+| P2-004 | 建立 real provider tool success gate（真实供应商工具成功门禁） | completed | `P2-004-real-provider-tool-success-gate-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
+| P2-005 | 强化 OpenAI-compatible provider options（OpenAI 兼容供应商参数）显式配置 | pending | `P2-005-openai-compatible-provider-options-hardening-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
+| P2-006 | 建立 complex real provider atomic task gate（复杂真实供应商原子任务门禁） | pending | `P2-006-complex-real-provider-atomic-task-gate-spec.md`, `P2-005-openai-compatible-provider-options-hardening-spec.md`, `testing-strategy.md`, `mvp-acceptance.md`, `roadmap.md` |
 
 Dependency notes（依赖说明）：
 
@@ -86,6 +88,8 @@ Dependency notes（依赖说明）：
 - P2-002 should run after or alongside P2-001 only as a manual/nightly or integration-profile gate（集成配置门禁）; it must not destabilize base CI（基础持续集成）.
 - P2-003 remains deferred; it should produce a design spec（设计规格） or ADR（架构决策记录） for evidence import protocol（证据导入协议） and permission boundary（权限边界） before any bridge implementation.
 - P2-004 should run after P2-002 because it tightens real provider validation from fail-closed acceptance（失败关闭验收） to success-only tool coverage（成功型工具覆盖）; it must remain manual/nightly and must not enter base CI（基础持续集成）.
+- P2-005 should run after P2-004 because the next real provider gates need explicit high-impact provider options（高影响供应商参数）, especially `reasoning_effort`（推理强度）, without hardcoded configurable options（硬编码可配置项） or silent fallback（静默降级）.
+- P2-006 should run after P2-005 because the complex real provider atomic task gate（复杂真实供应商原子任务门禁） should use the explicit provider option path, including `reasoning_effort=high`, and record those options in evidence/audit（证据/审计） context.
 - Earlier deferred ideas such as native tool calling adapter（原生工具调用适配器） and service runner / HTTP probe（服务运行与 HTTP 探测） are not removed from the roadmap; they are not part of the immediate P2 batch unless a later roadmap review re-prioritizes them.
 
 ### P2 Exit Gate: Roadmap Review

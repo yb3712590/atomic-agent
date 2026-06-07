@@ -13,7 +13,6 @@
 | 文档 | 状态 | 用途 | 何时读取 |
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
-| `P2-004-real-provider-tool-success-gate-plan.md` | draft | 定义 P2-004 real provider tool success gate（真实供应商工具成功门禁）的 TDD 实施步骤 | 执行 P2-004 前 |
 
 ## 4. Completed / Archived Documents
 
@@ -35,6 +34,7 @@
 | `P1-exit-gate-roadmap-review-plan.md` | 2026-06-07 | 已实施 P1 Exit Gate（P1 退出门禁）路线图复审、文档治理收尾和 P2 工作包滚动更新，保留为阶段门禁实施记录 |
 | `P2-001-evidence-mapping-artifact-hash-hardening-plan.md` | 2026-06-07 | 已实施 P2-001 event stream / evidence mapping（事件流 / 证据映射）和 artifact hash（产物哈希）硬化，保留为 TDD 实施记录 |
 | `P2-002-real-provider-minimal-integration-gate-plan.md` | 2026-06-07 | 已实施 P2-002 real provider minimal integration gate（真实模型供应商最小集成门禁），保留为 TDD 实施记录 |
+| `P2-004-real-provider-tool-success-gate-plan.md` | 2026-06-07 | 已实施 P2-004 real provider tool success gate（真实供应商工具成功门禁），保留为 TDD 实施记录 |
 
 ## 5. Update Rules
 

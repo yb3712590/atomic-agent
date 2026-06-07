@@ -151,6 +151,50 @@ python -m pytest -q
 
 真实 provider 测试不得要求一次性返回完整项目文件 JSON；这种模式已经被判定为 source delivery（源码交付）而不是 agent work（智能体工作）。
 
+P2-004 adds a separate default-disabled `real_provider_tool_success` marker（真实供应商工具成功标记）. It is stricter than P2-002: every case must end in `run.completed`（运行完成）, and provider empty output（供应商空输出）、invalid JSON（无效 JSON）、provider failure（供应商失败）、permission denied（权限拒绝）或 tool failure（工具失败）都不能算通过。
+
+默认命令：
+
+```bash
+python -m pytest tests/test_real_provider_tool_success.py -q
+```
+
+默认结果必须是 skip（跳过），因为未设置：
+
+```text
+ATOMIC_AGENT_RUN_REAL_PROVIDER_TOOL_SUCCESS=1
+```
+
+显式启用命令可复用 P2-002 Task 7 的本地 git ignored provider config（被 Git 忽略的供应商配置）：
+
+```bash
+set -a
+source .env.real-provider-test-p2-002-task7
+set +a
+ATOMIC_AGENT_RUN_REAL_PROVIDER_TOOL_SUCCESS=1 \
+python -m pytest tests/test_real_provider_tool_success.py -m real_provider_tool_success -q
+```
+
+Required env vars（必需环境变量）：
+
+```text
+ATOMIC_AGENT_RUN_REAL_PROVIDER_TOOL_SUCCESS=1
+ATOMIC_AGENT_REAL_PROVIDER_BASE_URL
+ATOMIC_AGENT_REAL_PROVIDER_API_KEY
+ATOMIC_AGENT_REAL_PROVIDER_MODEL
+```
+
+P2-004 success-only cases（成功型用例）覆盖：
+
+- `write_file`（写文件）
+- `read_file`（读文件）
+- `list_files`（列文件）
+- `apply_patch`（应用补丁）
+- `run_command`（运行声明命令）
+- `submit_result`（提交结果）
+
+每个 case 必须验证 event stream integrity（事件流完整性）和 evidence summary（证据摘要）；涉及 produced path（产出路径）的 case 必须验证 source inventory lineage（源码清单谱系）为 `traceable`（可追溯）。`run_command` case 必须验证 `command.completed` exit code（退出码）为 `0`，且 stdout/stderr artifacts（标准输出/错误产物）带 sha256。
+
 ## Test Data Rules
 
 - 测试 fixture（测试夹具）必须清晰标记 fake 或 real。

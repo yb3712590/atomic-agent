@@ -81,6 +81,74 @@ python -m pytest -q
 - runtime 执行动作并记录事件。
 - 如果模型输出错误，runtime 能记录错误并 fail closed 或受限 retry。
 
+P2-002 adds a default-disabled OpenAI-compatible real provider gate（OpenAI 兼容真实供应商门禁）。它只验证最小真实 provider action loop（供应商动作循环），不要求模型完成大型项目。
+
+默认命令：
+
+```bash
+python -m pytest tests/test_real_provider_integration.py -q
+```
+
+默认结果必须是 skip（跳过），因为未设置：
+
+```text
+ATOMIC_AGENT_RUN_REAL_PROVIDER=1
+```
+
+显式启用命令：
+
+```bash
+ATOMIC_AGENT_RUN_REAL_PROVIDER=1 \
+ATOMIC_AGENT_REAL_PROVIDER_BASE_URL="https://provider.example/v1" \
+ATOMIC_AGENT_REAL_PROVIDER_API_KEY="replace-with-real-key" \
+ATOMIC_AGENT_REAL_PROVIDER_MODEL="provider-model" \
+python -m pytest tests/test_real_provider_integration.py -m real_provider -q
+```
+
+Required env vars（必需环境变量）：
+
+```text
+ATOMIC_AGENT_RUN_REAL_PROVIDER=1
+ATOMIC_AGENT_REAL_PROVIDER_BASE_URL
+ATOMIC_AGENT_REAL_PROVIDER_API_KEY
+ATOMIC_AGENT_REAL_PROVIDER_MODEL
+```
+
+Optional env vars（可选环境变量）：
+
+```text
+ATOMIC_AGENT_REAL_PROVIDER_CONTEXT_WINDOW_TOKENS=400000
+ATOMIC_AGENT_REAL_PROVIDER_MAX_OUTPUT_TOKENS=8192
+ATOMIC_AGENT_REAL_PROVIDER_STREAM_IDLE_TIMEOUT_SECONDS=30
+ATOMIC_AGENT_REAL_PROVIDER_TOTAL_TIMEOUT_SECONDS=3600
+ATOMIC_AGENT_REAL_PROVIDER_MAX_STEPS=4
+ATOMIC_AGENT_REAL_PROVIDER_TEMPERATURE=
+ATOMIC_AGENT_REAL_PROVIDER_LABEL=
+```
+
+Accepted outcomes（可接受结果）：
+
+1. Outcome A：provider stream（供应商流）返回合法 JSON action（JSON 动作），runtime 执行至少一个工具，event stream（事件流）以 `run.completed` 结束，evidence summary（证据摘要）可构建。
+2. Outcome B：provider 返回合法 action 但模型行为偏离；event stream integrity（事件流完整性）必须可验证，evidence summary 不得把缺失 lineage（谱系）伪装为 traceable（可追溯）。
+3. Outcome C：provider SDK path（SDK 路径）已到达，但 response（响应）为空、截断、无法提取内容或无法解析为 action；runtime 必须 fail closed（失败关闭），event stream integrity 必须可验证。
+
+Rejected outcomes（不可算通过）：
+
+- missing credentials（缺失凭据）
+- authentication failure（认证失败）
+- DNS / connectivity / base URL failure（DNS / 连接 / 基础 URL 失败）
+- stream idle timeout（流空闲超时）
+- total timeout（总超时）
+- test harness misconfiguration（测试驱动配置错误）
+
+Base CI（基础持续集成）仍使用：
+
+```bash
+python -m pytest -q
+```
+
+该命令不得要求真实 provider credentials（真实供应商凭据），不得发起真实 provider 网络调用。
+
 真实 provider 测试不得要求一次性返回完整项目文件 JSON；这种模式已经被判定为 source delivery（源码交付）而不是 agent work（智能体工作）。
 
 ## Test Data Rules

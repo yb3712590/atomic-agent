@@ -44,7 +44,7 @@ class AgentLoopConfig:
 class AgentLoopDependencies:
     provider: ProviderAdapter
     filesystem_tools: FilesystemTools
-    command_tools: CommandTools
+    command_tools: CommandTools | None
     event_recorder: EventRecorder
     artifact_writer: ArtifactWriter
     runtime_clock: Callable[[], float]
@@ -314,6 +314,8 @@ class AgentLoop:
             if decision.decision == PathDecisionType.DENY:
                 return PermissionDecision("deny", decision.reason, requirements.policy_ref)
         if action.action == AgentActionType.RUN_COMMAND:
+            if self.dependencies.command_tools is None:
+                return PermissionDecision("deny", "command_tools dependency is not configured", requirements.policy_ref)
             command_id = action.input.get("command_id")
             if not CommandPolicy.is_valid_command_id(command_id):
                 return PermissionDecision("deny", "command_id must be a non-empty stable identifier", requirements.policy_ref)
@@ -325,6 +327,8 @@ class AgentLoop:
         if action.action in _FILESYSTEM_ACTIONS:
             return execute_filesystem_action(action, self.dependencies.filesystem_tools)
         if action.action == AgentActionType.RUN_COMMAND:
+            if self.dependencies.command_tools is None:
+                raise AgentLoopError("command_tools dependency is not configured")
             return execute_command_action(action, self.dependencies.command_tools)
         if action.action == AgentActionType.WEB_FETCH:
             if self.dependencies.web_fetch_tools is None:

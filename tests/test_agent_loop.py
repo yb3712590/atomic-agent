@@ -18,6 +18,7 @@ from atomic_agent.web_fetch_tools import NetworkAllowRule, NetworkPolicy, WebFet
 
 
 PYTHON = Path(sys.executable).resolve()
+_USE_DEFAULT_COMMAND_TOOLS = object()
 
 
 class RecordingHandler(BaseHTTPRequestHandler):
@@ -177,7 +178,7 @@ def make_invocation(tmp_path, tools=None, budgets=None, allowed_write_set=None):
     )
 
 
-def make_loop(tmp_path, provider, runtime_clock=None, web_fetch_tools=None):
+def make_loop(tmp_path, provider, runtime_clock=None, web_fetch_tools=None, command_tools=_USE_DEFAULT_COMMAND_TOOLS):
     event_dir = tmp_path / "events"
     event_dir.mkdir()
     artifact_dir = tmp_path / "artifacts"
@@ -194,22 +195,23 @@ def make_loop(tmp_path, provider, runtime_clock=None, web_fetch_tools=None):
             max_matches_limit=500,
         ),
     )
-    command_policy = CommandPolicy(
-        {
-            "check-output": CommandSpec(
-                argv=(
-                    str(PYTHON),
-                    "-c",
-                    "from pathlib import Path; import sys; content = Path('work/output.txt').read_text(encoding='utf-8'); sys.exit(0 if content == 'fixed' else 3)",
+    if command_tools is _USE_DEFAULT_COMMAND_TOOLS:
+        command_policy = CommandPolicy(
+            {
+                "check-output": CommandSpec(
+                    argv=(
+                        str(PYTHON),
+                        "-c",
+                        "from pathlib import Path; import sys; content = Path('work/output.txt').read_text(encoding='utf-8'); sys.exit(0 if content == 'fixed' else 3)",
+                    )
                 )
-            )
-        }
-    )
-    command_tools = CommandTools(
-        guard,
-        command_policy,
-        CommandToolConfig(default_timeout_seconds=2.0, max_timeout_seconds=5.0, max_output_bytes=4096),
-    )
+            }
+        )
+        command_tools = CommandTools(
+            guard,
+            command_policy,
+            CommandToolConfig(default_timeout_seconds=2.0, max_timeout_seconds=5.0, max_output_bytes=4096),
+        )
     recorder = EventRecorder(
         run_id="run_001",
         config=EventRecorderConfig(
@@ -477,6 +479,24 @@ def test_agent_loop_fails_closed_when_web_fetch_tools_are_not_configured(tmp_pat
     event_types = [event["type"] for event in read_jsonl(event_stream_path)]
     assert "tool.attempt.started" not in event_types
     assert "network.fetch.completed" not in event_types
+    assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_fails_closed_when_command_tools_are_not_configured(tmp_path):
+    provider = ScriptedProvider([action("step-command", "run_command", {"command_id": "check-output"})])
+    loop, event_stream_path = make_loop(tmp_path, provider, command_tools=None)
+    invocation = make_invocation(tmp_path, tools=["run_command", "submit_result"])
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "policy_denied"
+    assert result.failed_action_ref == "step-command"
+    assert "command_tools" in result.failure_message
+    event_types = [event["type"] for event in read_jsonl(event_stream_path)]
+    assert "tool.attempt.started" not in event_types
+    assert "command.completed" not in event_types
     assert event_types[-3:] == ["permission.decided", "action.rejected", "run.failed"]
 
 

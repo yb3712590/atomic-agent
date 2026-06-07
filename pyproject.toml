@@ -15,10 +15,14 @@ dependencies = [
 test = [
   "pytest>=8.0,<9.0",
 ]
+real-provider = [
+  "openai>=1.0,<2.0",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["tests"]
 markers = [
   "permission_negative: fail-closed permission and security boundary tests",
+  "real_provider: OpenAI-compatible real provider integration tests; skipped unless ATOMIC_AGENT_RUN_REAL_PROVIDER=1",
 ]

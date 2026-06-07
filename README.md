@@ -74,7 +74,63 @@ PYTHONPATH=src python -m atomic_agent.examples.minimal_fake_loop \
 
 该示例仍必须满足：真实执行、真实退出码、真实事件输出；不得以静态文本、模拟结果或 silent fallback（静默降级）伪装成功。
 
-## 4. 文档入口在哪里
+## 4. 如何运行真实 provider gate（手动/夜间）
+
+除 deterministic fake provider loop（确定性假模型供应商循环）外，本仓库还提供默认禁用的 OpenAI-compatible real provider gate（OpenAI 兼容真实模型供应商门禁）。它用于验证真实 provider streaming（流式响应）、provider-agnostic `AgentAction`（供应商无关智能体动作）、受控工具执行、JSONL event stream（JSONL 事件流）和 evidence summary（证据摘要）链路。
+
+该门禁不同于 fake provider minimal example（假供应商最小示例）：
+
+- fake provider example 默认本地运行、确定性、无网络。
+- real provider gate 必须显式提供 OpenAI-compatible provider（OpenAI 兼容供应商）配置和 API key（接口密钥）。
+- real provider gate 不进入默认 base CI（基础持续集成）联网路径。
+- provider output（模型输出）不能单独作为 implementation evidence（实现证据）；必须结合 tool attempt（工具尝试）、workspace mutation（工作区变更）、event stream integrity（事件流完整性）和 artifact hash（产物哈希）判断。
+
+安装可选依赖：
+
+```bash
+python -m pip install ".[test,real-provider]"
+```
+
+手动运行 standalone loop（独立循环）：
+
+```bash
+rm -rf /tmp/atomic-agent-real-provider
+export ATOMIC_AGENT_REAL_PROVIDER_API_KEY="replace-with-real-key"
+PYTHONPATH=src python -m atomic_agent.examples.minimal_real_provider_loop \
+  --run-id real_provider_example \
+  --workspace /tmp/atomic-agent-real-provider/workspace \
+  --event-stream /tmp/atomic-agent-real-provider/events/events.jsonl \
+  --artifact-root /tmp/atomic-agent-real-provider/artifacts \
+  --result /tmp/atomic-agent-real-provider/result.json \
+  --base-url https://provider.example/v1 \
+  --api-key-env ATOMIC_AGENT_REAL_PROVIDER_API_KEY \
+  --model provider-model \
+  --context-window-tokens 400000 \
+  --max-output-tokens 8192 \
+  --stream-idle-timeout-seconds 30 \
+  --total-timeout-seconds 3600 \
+  --max-steps 4
+```
+
+成功时 stdout（标准输出）是 JSON，包含：
+
+```json
+{"artifact_root":"/tmp/atomic-agent-real-provider/artifacts","event_stream_path":"/tmp/atomic-agent-real-provider/events/events.jsonl","result_path":"/tmp/atomic-agent-real-provider/result.json","status":"completed","workspace_output_path":"/tmp/atomic-agent-real-provider/workspace/work/real-provider-output.txt"}
+```
+
+运行 pytest integration gate（集成门禁）：
+
+```bash
+ATOMIC_AGENT_RUN_REAL_PROVIDER=1 \
+ATOMIC_AGENT_REAL_PROVIDER_BASE_URL="https://provider.example/v1" \
+ATOMIC_AGENT_REAL_PROVIDER_API_KEY="replace-with-real-key" \
+ATOMIC_AGENT_REAL_PROVIDER_MODEL="provider-model" \
+python -m pytest tests/test_real_provider_integration.py -m real_provider -q
+```
+
+未设置 `ATOMIC_AGENT_RUN_REAL_PROVIDER=1` 时，该测试必须 skip（跳过）。认证失败、缺失凭据、网络连接失败、base URL 错误、stream idle timeout（流空闲超时）或 total timeout（总超时）不能算作 gate pass（门禁通过）。本地可使用 `.env.*` 文件保存临时 provider config（供应商配置），但该文件必须保持 git ignored（被 Git 忽略），且不是未来正式调用配置格式。
+
+## 5. 文档入口在哪里
 
 文档入口是：
 

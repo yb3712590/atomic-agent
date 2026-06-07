@@ -14,6 +14,7 @@
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
 | `mvp-runtime-spec.md` | active | 定义 MVP runtime 的工具、策略、事件、provider、配置来源和输出要求 | 实现或调整 MVP 范围前 |
+| `P2-004-real-provider-tool-success-gate-spec.md` | draft | 定义 P2-004 real provider tool success gate（真实供应商工具成功门禁）的成功型集成测试范围和验收标准 | 实施 P2-004 前 |
 
 ## 4. Completed / Archived Documents
 
@@ -33,6 +34,7 @@
 | `P1-004-boardroom-agent-runtime-port-adapter-spec.md` | 2026-06-06 | 已实现 P1-004 Boardroom AgentRuntimePort adapter（Boardroom 智能体运行时端口适配器），保留为端口适配器规格记录 |
 | `P1-exit-gate-roadmap-review-spec.md` | 2026-06-07 | 已完成 P1 Exit Gate（P1 退出门禁）路线图复审规格，保留为阶段门禁规格记录 |
 | `P2-001-evidence-mapping-artifact-hash-hardening-spec.md` | 2026-06-07 | 已实现 P2-001 event stream / evidence mapping（事件流 / 证据映射）和 artifact hash（产物哈希）硬化，保留为证据映射规格记录 |
+| `P2-002-real-provider-minimal-integration-gate-spec.md` | 2026-06-07 | 已实现 P2-002 real provider minimal integration gate（真实模型供应商最小集成门禁），保留为真实供应商集成门禁规格记录 |
 
 ## 5. Update Rules
 

@@ -32,6 +32,30 @@ def env_value(name, default):
     return os.environ.get(name, default)
 
 
+def extend_optional_arg(args, env_name, cli_name):
+    value = os.environ.get(env_name)
+    if value is not None:
+        args.extend([cli_name, value])
+
+
+def test_extend_optional_arg_forwards_empty_string_when_explicitly_set(monkeypatch):
+    args = []
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_STOP", "")
+
+    extend_optional_arg(args, "ATOMIC_AGENT_REAL_PROVIDER_STOP", "--stop")
+
+    assert args == ["--stop", ""]
+
+
+def test_extend_optional_arg_skips_absent_env(monkeypatch):
+    args = []
+    monkeypatch.delenv("ATOMIC_AGENT_REAL_PROVIDER_STOP", raising=False)
+
+    extend_optional_arg(args, "ATOMIC_AGENT_REAL_PROVIDER_STOP", "--stop")
+
+    assert args == []
+
+
 def run_real_provider_gate(tmp_path):
     base = tmp_path / "real-provider-gate"
     workspace = base / "workspace"
@@ -79,6 +103,19 @@ def run_real_provider_gate(tmp_path):
     provider_label = os.environ.get("ATOMIC_AGENT_REAL_PROVIDER_LABEL")
     if provider_label:
         args.extend(["--provider-label", provider_label])
+    for env_name, cli_name in [
+        ("ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT", "--reasoning-effort"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_TOP_P", "--top-p"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_PRESENCE_PENALTY", "--presence-penalty"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_FREQUENCY_PENALTY", "--frequency-penalty"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_SEED", "--seed"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_STOP", "--stop"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON", "--response-format-json"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_STREAM_OPTIONS_JSON", "--stream-options-json"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_SERVICE_TIER", "--service-tier"),
+        ("ATOMIC_AGENT_REAL_PROVIDER_USER", "--user"),
+    ]:
+        extend_optional_arg(args, env_name, cli_name)
     completed = subprocess.run(args, cwd=PROJECT_ROOT, env=env, text=True, capture_output=True, check=False)
     return completed, result, event_stream
 

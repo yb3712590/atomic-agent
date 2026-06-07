@@ -47,6 +47,39 @@ class CliProviderConfig:
     max_steps: int
     temperature: float | None
     provider_label: str | None
+    reasoning_effort: str | None = None
+    top_p: float | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    seed: int | None = None
+    stop: tuple[str, ...] | None = None
+    response_format: dict[str, object] | None = None
+    stream_options: dict[str, object] | None = None
+    service_tier: str | None = None
+    user: str | None = None
+
+    def to_provider_options(self) -> OpenAICompatibleProviderOptions:
+        return OpenAICompatibleProviderOptions(
+            base_url=self.base_url,
+            api_key=self.api_key,
+            model=self.model,
+            context_window_tokens=self.context_window_tokens,
+            max_output_tokens=self.max_output_tokens,
+            stream_idle_timeout_seconds=self.stream_idle_timeout_seconds,
+            total_timeout_seconds=self.total_timeout_seconds,
+            temperature=self.temperature,
+            provider_label=self.provider_label,
+            reasoning_effort=self.reasoning_effort,
+            top_p=self.top_p,
+            presence_penalty=self.presence_penalty,
+            frequency_penalty=self.frequency_penalty,
+            seed=self.seed,
+            stop=self.stop,
+            response_format=self.response_format,
+            stream_options=self.stream_options,
+            service_tier=self.service_tier,
+            user=self.user,
+        )
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -87,6 +120,16 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--max-steps", required=True, type=parse_positive_int)
     parser.add_argument("--temperature", type=parse_float_or_none, default=None)
     parser.add_argument("--provider-label", default=None)
+    parser.add_argument("--reasoning-effort", default=None)
+    parser.add_argument("--top-p", type=parse_float_or_none, default=None)
+    parser.add_argument("--presence-penalty", type=parse_float_or_none, default=None)
+    parser.add_argument("--frequency-penalty", type=parse_float_or_none, default=None)
+    parser.add_argument("--seed", type=parse_int_or_none, default=None)
+    parser.add_argument("--stop", type=parse_stop_or_none, default=None)
+    parser.add_argument("--response-format-json", type=parse_json_object_or_none, default=None)
+    parser.add_argument("--stream-options-json", type=parse_json_object_or_none, default=None)
+    parser.add_argument("--service-tier", default=None)
+    parser.add_argument("--user", default=None)
     return parser
 
 
@@ -122,6 +165,41 @@ def parse_float_or_none(value: str) -> float | None:
     return parsed
 
 
+def parse_int_or_none(value: str) -> int | None:
+    if value == "":
+        return None
+    try:
+        return int(value)
+    except ValueError as error:
+        raise argparse.ArgumentTypeError("must be an integer or empty string") from error
+
+
+def parse_json_object_or_none(value: str) -> dict[str, object] | None:
+    if value == "":
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise argparse.ArgumentTypeError("must be a JSON object or empty string") from error
+    if not isinstance(parsed, dict):
+        raise argparse.ArgumentTypeError("must be a JSON object or empty string")
+    return parsed
+
+
+def parse_stop_or_none(value: str) -> tuple[str, ...] | None:
+    if value == "":
+        return None
+    try:
+        parsed = json.loads(value)
+    except json.JSONDecodeError as error:
+        raise argparse.ArgumentTypeError("must be a non-empty JSON array of non-empty strings or empty string") from error
+    if not isinstance(parsed, list) or not parsed:
+        raise argparse.ArgumentTypeError("must be a non-empty JSON array of non-empty strings or empty string")
+    if any(not isinstance(item, str) or item == "" for item in parsed):
+        raise argparse.ArgumentTypeError("must be a non-empty JSON array of non-empty strings or empty string")
+    return tuple(parsed)
+
+
 def resolve_cli_path(value: str) -> Path:
     if not isinstance(value, str) or not value.strip():
         raise ExampleInputError("path arguments must be non-empty strings")
@@ -137,6 +215,9 @@ def provider_config_from_args(args: argparse.Namespace) -> CliProviderConfig:
         raise ExampleInputError(f"environment variable {api_key_env} must be set")
     if args.provider_label is not None and args.provider_label == "":
         raise ExampleInputError("provider label must be non-empty when provided")
+    reasoning_effort = args.reasoning_effort or None
+    service_tier = args.service_tier or None
+    user = args.user or None
     return CliProviderConfig(
         base_url=args.base_url,
         api_key=api_key,
@@ -148,6 +229,16 @@ def provider_config_from_args(args: argparse.Namespace) -> CliProviderConfig:
         max_steps=args.max_steps,
         temperature=args.temperature,
         provider_label=args.provider_label,
+        reasoning_effort=reasoning_effort,
+        top_p=args.top_p,
+        presence_penalty=args.presence_penalty,
+        frequency_penalty=args.frequency_penalty,
+        seed=args.seed,
+        stop=args.stop,
+        response_format=args.response_format_json,
+        stream_options=args.stream_options_json,
+        service_tier=service_tier,
+        user=user,
     )
 
 
@@ -191,18 +282,7 @@ def run_example(run_id: str, paths: ExamplePaths, provider_config: CliProviderCo
 
 
 def build_invocation(paths: ExamplePaths, provider_config: CliProviderConfig) -> AgentInvocation:
-    provider_profile = {
-        "provider": "openai-compatible",
-        "model": provider_config.model,
-        "context_window_tokens": provider_config.context_window_tokens,
-        "max_output_tokens": provider_config.max_output_tokens,
-        "stream_idle_timeout_seconds": provider_config.stream_idle_timeout_seconds,
-        "total_timeout_seconds": provider_config.total_timeout_seconds,
-    }
-    if provider_config.provider_label is not None:
-        provider_profile["provider_label"] = provider_config.provider_label
-    else:
-        provider_profile["base_url"] = provider_config.base_url
+    provider_profile = provider_config.to_provider_options().to_provider_profile()
     return AgentInvocation(
         invocation_id="inv_minimal_real_provider_example",
         task=(
@@ -252,19 +332,7 @@ def build_loop(run_id: str, paths: ExamplePaths, provider_config: CliProviderCon
             artifact_ref_prefix=f"artifact://{run_id}",
         )
     )
-    provider = OpenAICompatibleProviderAdapter(
-        options=OpenAICompatibleProviderOptions(
-            base_url=provider_config.base_url,
-            api_key=provider_config.api_key,
-            model=provider_config.model,
-            context_window_tokens=provider_config.context_window_tokens,
-            max_output_tokens=provider_config.max_output_tokens,
-            stream_idle_timeout_seconds=provider_config.stream_idle_timeout_seconds,
-            total_timeout_seconds=provider_config.total_timeout_seconds,
-            temperature=provider_config.temperature,
-            provider_label=provider_config.provider_label,
-        )
-    )
+    provider = OpenAICompatibleProviderAdapter(options=provider_config.to_provider_options())
     return AgentLoop(
         AgentLoopConfig(run_id=run_id),
         AgentLoopDependencies(

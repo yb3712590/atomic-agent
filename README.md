@@ -106,10 +106,21 @@ PYTHONPATH=src python -m atomic_agent.examples.minimal_real_provider_loop \
   --api-key-env ATOMIC_AGENT_REAL_PROVIDER_API_KEY \
   --model provider-model \
   --context-window-tokens 400000 \
-  --max-output-tokens 8192 \
+  --max-output-tokens 128000 \
   --stream-idle-timeout-seconds 30 \
   --total-timeout-seconds 3600 \
-  --max-steps 4
+  --max-steps 4 \
+  --temperature 0.2 \
+  --reasoning-effort high \
+  --top-p 1.0 \
+  --presence-penalty 0.0 \
+  --frequency-penalty 0.0 \
+  --seed 20260608 \
+  --stop '' \
+  --response-format-json '{"type":"json_object"}' \
+  --stream-options-json '{"include_usage":true}' \
+  --service-tier '' \
+  --user atomic-agent-boardroom-os
 ```
 
 成功时 stdout（标准输出）是 JSON，包含：
@@ -125,10 +136,15 @@ ATOMIC_AGENT_RUN_REAL_PROVIDER=1 \
 ATOMIC_AGENT_REAL_PROVIDER_BASE_URL="https://provider.example/v1" \
 ATOMIC_AGENT_REAL_PROVIDER_API_KEY="replace-with-real-key" \
 ATOMIC_AGENT_REAL_PROVIDER_MODEL="provider-model" \
+ATOMIC_AGENT_REAL_PROVIDER_TEMPERATURE=0.2 \
+ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT=high \
+ATOMIC_AGENT_REAL_PROVIDER_TOP_P=1.0 \
+ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON='{"type":"json_object"}' \
+ATOMIC_AGENT_REAL_PROVIDER_STREAM_OPTIONS_JSON='{"include_usage":true}' \
 python -m pytest tests/test_real_provider_integration.py -m real_provider -q
 ```
 
-未设置 `ATOMIC_AGENT_RUN_REAL_PROVIDER=1` 时，该测试必须 skip（跳过）。认证失败、缺失凭据、网络连接失败、base URL 错误、stream idle timeout（流空闲超时）或 total timeout（总超时）不能算作 gate pass（门禁通过）。本地可使用 `.env.*` 文件保存临时 provider config（供应商配置），但该文件必须保持 git ignored（被 Git 忽略），且不是未来正式调用配置格式。
+未设置 `ATOMIC_AGENT_RUN_REAL_PROVIDER=1` 时，该测试必须 skip（跳过）。认证失败、缺失凭据、网络连接失败、base URL 错误、stream idle timeout（流空闲超时）或 total timeout（总超时）不能算作 gate pass（门禁通过）。本地可使用 `.env.*` 文件保存临时 provider config（供应商配置），但该文件必须保持 git ignored（被 Git 忽略），且不是未来正式调用配置格式。仓库提供 `.env.template`（脱敏环境模板）作为可同步示例；其中 `base_url` 和 `api_key` 只能使用 placeholder（占位符），不得写入真实供应商地址或密钥。P2-005 capability-first profile（能力优先配置画像）中的显式参数如果被目标 provider 拒绝，必须 fail closed（失败关闭），不得自动移除参数后静默重试。
 
 ## 5. 文档入口在哪里
 

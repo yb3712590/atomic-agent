@@ -66,6 +66,33 @@ def env_float_or_none(name, default):
     return float(raw)
 
 
+def env_int_or_none(name, default):
+    raw = os.environ.get(name, default)
+    if raw in (None, ""):
+        return None
+    return int(raw)
+
+
+def env_json_object_or_none(name, default):
+    raw = os.environ.get(name, default)
+    if raw in (None, ""):
+        return None
+    parsed = json.loads(raw)
+    if not isinstance(parsed, dict):
+        raise ValueError(f"{name} must be a JSON object or empty string")
+    return parsed
+
+
+def env_stop_or_none(name, default):
+    raw = os.environ.get(name, default)
+    if raw in (None, ""):
+        return None
+    parsed = json.loads(raw)
+    if not isinstance(parsed, list) or not parsed or any(not isinstance(item, str) or item == "" for item in parsed):
+        raise ValueError(f"{name} must be a non-empty JSON array of non-empty strings or empty string")
+    return tuple(parsed)
+
+
 def provider_options():
     return OpenAICompatibleProviderOptions(
         base_url=os.environ["ATOMIC_AGENT_REAL_PROVIDER_BASE_URL"],
@@ -77,7 +104,70 @@ def provider_options():
         total_timeout_seconds=float(env_value("ATOMIC_AGENT_REAL_PROVIDER_TOTAL_TIMEOUT_SECONDS", "3600")),
         temperature=env_float_or_none("ATOMIC_AGENT_REAL_PROVIDER_TEMPERATURE", ""),
         provider_label=os.environ.get("ATOMIC_AGENT_REAL_PROVIDER_LABEL") or None,
+        reasoning_effort=os.environ.get("ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT") or None,
+        top_p=env_float_or_none("ATOMIC_AGENT_REAL_PROVIDER_TOP_P", ""),
+        presence_penalty=env_float_or_none("ATOMIC_AGENT_REAL_PROVIDER_PRESENCE_PENALTY", ""),
+        frequency_penalty=env_float_or_none("ATOMIC_AGENT_REAL_PROVIDER_FREQUENCY_PENALTY", ""),
+        seed=env_int_or_none("ATOMIC_AGENT_REAL_PROVIDER_SEED", ""),
+        stop=env_stop_or_none("ATOMIC_AGENT_REAL_PROVIDER_STOP", ""),
+        response_format=env_json_object_or_none("ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON", ""),
+        stream_options=env_json_object_or_none("ATOMIC_AGENT_REAL_PROVIDER_STREAM_OPTIONS_JSON", ""),
+        service_tier=os.environ.get("ATOMIC_AGENT_REAL_PROVIDER_SERVICE_TIER") or None,
+        user=os.environ.get("ATOMIC_AGENT_REAL_PROVIDER_USER") or None,
     )
+
+
+def test_provider_options_reads_explicit_p2_005_env(monkeypatch):
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_BASE_URL", "https://provider.example/v1")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_API_KEY", "secret-key")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_MODEL", "provider-model")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_TEMPERATURE", "0.2")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT", "high")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_TOP_P", "1.0")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_PRESENCE_PENALTY", "0.0")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_FREQUENCY_PENALTY", "0.0")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_SEED", "20260608")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_STOP", '["END_ACTION"]')
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON", '{"type":"json_object"}')
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_STREAM_OPTIONS_JSON", '{"include_usage":true}')
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_SERVICE_TIER", "default")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_USER", "atomic-agent-boardroom-os")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_LABEL", "boardroom-os-real-provider")
+
+    options = provider_options()
+
+    assert options.temperature == 0.2
+    assert options.reasoning_effort == "high"
+    assert options.top_p == 1.0
+    assert options.presence_penalty == 0.0
+    assert options.frequency_penalty == 0.0
+    assert options.seed == 20260608
+    assert options.stop == ("END_ACTION",)
+    assert options.response_format == {"type": "json_object"}
+    assert options.stream_options == {"include_usage": True}
+    assert options.service_tier == "default"
+    assert options.user == "atomic-agent-boardroom-os"
+    assert options.provider_label == "boardroom-os-real-provider"
+
+
+def test_provider_options_rejects_non_object_json_env(monkeypatch):
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_BASE_URL", "https://provider.example/v1")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_API_KEY", "secret-key")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_MODEL", "provider-model")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON", "[]")
+
+    with pytest.raises(ValueError, match="ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON must be a JSON object"):
+        provider_options()
+
+
+def test_provider_options_rejects_invalid_stop_env(monkeypatch):
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_BASE_URL", "https://provider.example/v1")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_API_KEY", "secret-key")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_MODEL", "provider-model")
+    monkeypatch.setenv("ATOMIC_AGENT_REAL_PROVIDER_STOP", "[]")
+
+    with pytest.raises(ValueError, match="ATOMIC_AGENT_REAL_PROVIDER_STOP must be a non-empty JSON array"):
+        provider_options()
 
 
 def utc_timestamp():
@@ -108,15 +198,7 @@ def build_invocation(case, workspace, options):
         allowed_write_set=["work/"],
         tools=list(case.enabled_tools),
         permission_policy={"policy_ref": f"policy://tests/real-provider-tool-success/{case.name}"},
-        provider_profile={
-            "provider": "openai-compatible",
-            "provider_label": options.provider_label,
-            "model": options.model,
-            "context_window_tokens": options.context_window_tokens,
-            "max_output_tokens": options.max_output_tokens,
-            "stream_idle_timeout_seconds": options.stream_idle_timeout_seconds,
-            "total_timeout_seconds": options.total_timeout_seconds,
-        },
+        provider_profile=options.to_provider_profile(),
         budgets={
             "max_steps": max_steps,
             "max_parse_failures": 1,

@@ -26,10 +26,12 @@ P2-005 的目标是把真实 OpenAI-compatible provider（OpenAI 兼容供应商
 P2-005 实施前必须人工复核当前官方文档，不能只依赖本文写作时的网页抓取结果。复核清单：
 
 1. 对照 OpenAI Chat Completions API reference（OpenAI 聊天补全接口参考）确认每个 request parameter（请求参数）的最终名称、类型、是否 deprecated（已废弃）以及 Chat Completions 路径是否仍支持。
-2. 对照 OpenAI reasoning models guide（OpenAI 推理模型指南）确认 reasoning models（推理模型）在 Chat Completions 与 Responses API（响应接口）中的参数差异，尤其是 `reasoning_effort` 与 `reasoning.effort` 命名差异。
+2. 对照 OpenAI reasoning models guide（OpenAI 推理模型指南）确认 reasoning models（推理模型）在 Chat Completions 与 Responses API（响应接口）中的参数差异，尤其是 `reasoning_effort` 与 `reasoning.effort` 命名差异。当前人工复核结论（2026-06-08）：OpenAI Responses API 示例使用嵌套 `reasoning: {"effort": "medium"}`；P2-005 仍保持既有 OpenAI-compatible Chat Completions streaming（聊天补全流式）路径，不切换 Responses API。P2-005 runtime option（运行时选项）保留语义字段 `reasoning_effort`，本适配器路径将其映射到 Chat Completions request field（聊天补全请求字段）`reasoning_effort`；未来若切换 Responses API，必须另行修订 spec/plan 并映射为嵌套 `reasoning.effort`。
 3. 确认 `reasoning_effort` 支持值及模型支持子集；本文建议值只作为候选集合，不替代官方文档。
 4. 确认 `max_tokens`、`max_completion_tokens` 或其它 output cap（输出上限）字段在目标模型上的当前语义；如果官方文档要求更换字段，应先更新本规格或在实施计划中明确兼容策略。
 5. 对照目标 OpenAI-compatible provider（OpenAI 兼容供应商）的文档确认其兼容字段；不支持的显式字段必须 fail closed（失败关闭），不得 silent retry（静默重试）移除该字段。
+
+复核结果必须记录在 P2-005 implementation plan（实施计划）或 implementation notes（实施备注）中，至少包含复核日期、Chat Completions（聊天补全）中的 reasoning effort（推理强度）字段名、output cap（输出上限）字段名和是否需要修订本文。如果官方文档显示 `reasoning_effort`、`max_tokens` 或其它 P2-005 字段名称/语义已变化，必须先修订本文和对应 plan，再实施 runtime code（运行时代码）。
 
 ## Scope
 
@@ -96,6 +98,35 @@ P2-005 必须优先暴露以下字段：
    - 写入 `provider_profile`，供 evidence/audit 使用。
 5. `reasoning_effort` 不属于 `AgentInvocation.budgets`。`budgets` 继续只表达 runtime（运行时）资源限制，例如 `max_steps`、`max_wall_seconds`、`max_observation_chars`。
 6. P2-006 complex gate（复杂门禁）可默认使用 `high`，但 P2-005 本身不应硬编码默认值。
+
+## Capability-first Local Profile
+
+P2-005 必须区分 runtime core（运行时核心）默认值和 local/manual gate profile（本地/手动门禁配置画像）：
+
+1. `OpenAICompatibleProviderOptions`（OpenAI 兼容供应商选项）和 `OpenAICompatibleProviderAdapter`（OpenAI 兼容供应商适配器）不得硬编码 P2-005 新增参数默认值；`None` 继续表示 unset（未设置）并且不发送到 provider。
+2. 本地 git ignored（被 Git 忽略）配置文件 `.env.real-provider-test-p2-002-task7` 可以保存面向 Boardroom OS（Boardroom 操作系统）自治 agent team（自治智能体团队）的显式 capability-first profile（能力优先配置画像）。
+3. tracked（被 Git 跟踪）模板 `.env.template` 必须使用脱敏 placeholder（占位符）表达同一套 profile，不得包含真实 `base_url`、`api_key` 或供应商私有地址。
+4. capability-first profile 的推荐值为：
+
+```text
+ATOMIC_AGENT_REAL_PROVIDER_TEMPERATURE=0.2
+ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT=high
+ATOMIC_AGENT_REAL_PROVIDER_TOP_P=1.0
+ATOMIC_AGENT_REAL_PROVIDER_PRESENCE_PENALTY=0.0
+ATOMIC_AGENT_REAL_PROVIDER_FREQUENCY_PENALTY=0.0
+ATOMIC_AGENT_REAL_PROVIDER_SEED=20260608
+ATOMIC_AGENT_REAL_PROVIDER_STOP=
+ATOMIC_AGENT_REAL_PROVIDER_RESPONSE_FORMAT_JSON='{"type":"json_object"}'
+ATOMIC_AGENT_REAL_PROVIDER_STREAM_OPTIONS_JSON='{"include_usage":true}'
+ATOMIC_AGENT_REAL_PROVIDER_SERVICE_TIER=
+ATOMIC_AGENT_REAL_PROVIDER_USER=atomic-agent-boardroom-os
+ATOMIC_AGENT_REAL_PROVIDER_LABEL=boardroom-os-real-provider
+```
+
+5. `temperature=0.2` 用于提高 JSON `AgentAction`（智能体动作）输出稳定性；这不是成本优化，也不是 runtime core 默认值。
+6. `stop` 默认必须保持空字符串，解析为 unset（未设置），避免截断 JSON action。
+7. `response_format={"type":"json_object"}` 和 `stream_options={"include_usage":true}` 是能力/审计优先 profile 的显式配置；如果目标 provider 不支持这些参数，必须 fail closed（失败关闭），不得 silent retry（静默重试）移除参数。
+8. 如果用户为了兼容特定 provider 调整 profile，应通过 env/template 明确修改配置，而不是由 runtime 根据 provider/model 猜测。
 
 ## CLI and Environment Variables
 

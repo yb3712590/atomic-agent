@@ -154,6 +154,109 @@ def test_adapter_sends_temperature_when_configured():
     assert client.requests[0]["temperature"] == 0.2
 
 
+def test_adapter_sends_all_explicit_provider_options():
+    client = FakeOpenAIClient(chunks=[chunk(VALID_ACTION_TEXT)])
+    opts = options(
+        reasoning_effort="high",
+        top_p=1.0,
+        presence_penalty=0.0,
+        frequency_penalty=0.0,
+        seed=20260608,
+        stop=("END_ACTION",),
+        response_format={"type": "json_object"},
+        stream_options={"include_usage": True},
+        service_tier="default",
+        user="atomic-agent-boardroom-os",
+    )
+
+    adapter(client, opts=opts).complete(provider_context())
+
+    request = client.requests[0]
+    assert request["reasoning_effort"] == "high"
+    assert request["top_p"] == 1.0
+    assert request["presence_penalty"] == 0.0
+    assert request["frequency_penalty"] == 0.0
+    assert request["seed"] == 20260608
+    assert request["stop"] == ["END_ACTION"]
+    assert request["response_format"] == {"type": "json_object"}
+    assert request["stream_options"] == {"include_usage": True}
+    assert request["service_tier"] == "default"
+    assert request["user"] == "atomic-agent-boardroom-os"
+
+
+def test_adapter_omits_unset_provider_options():
+    client = FakeOpenAIClient(chunks=[chunk(VALID_ACTION_TEXT)])
+
+    adapter(client).complete(provider_context())
+
+    request = client.requests[0]
+    for key in [
+        "reasoning_effort",
+        "top_p",
+        "presence_penalty",
+        "frequency_penalty",
+        "seed",
+        "stop",
+        "response_format",
+        "stream_options",
+        "service_tier",
+        "user",
+    ]:
+        assert key not in request
+
+
+def test_provider_profile_records_explicit_non_secret_options_without_base_url_when_label_is_set():
+    profile = options(
+        base_url="https://secret-provider.example/v1",
+        api_key="secret-key",
+        provider_label="boardroom-os-real-provider",
+        reasoning_effort="high",
+        top_p=1.0,
+        presence_penalty=0.0,
+        frequency_penalty=0.0,
+        seed=20260608,
+        stop=("END_ACTION",),
+        response_format={"type": "json_object"},
+        stream_options={"include_usage": True},
+        service_tier="default",
+        user="atomic-agent-boardroom-os",
+    ).to_provider_profile()
+
+    assert profile["provider"] == "openai-compatible"
+    assert profile["provider_label"] == "boardroom-os-real-provider"
+    assert profile["reasoning_effort"] == "high"
+    assert profile["response_format"] == {"type": "json_object"}
+    assert profile["stream_options"] == {"include_usage": True}
+    serialized = json.dumps(profile, sort_keys=True)
+    assert "secret-key" not in serialized
+    assert "secret-provider.example" not in serialized
+    assert "base_url" not in profile
+
+
+def test_provider_profile_records_base_url_only_without_provider_label():
+    profile = options(provider_label=None).to_provider_profile()
+
+    assert profile["base_url"] == "https://provider.example/v1"
+    assert "provider_label" not in profile
+
+
+def test_options_reject_invalid_new_provider_options():
+    invalid_overrides = [
+        {"reasoning_effort": "turbo"},
+        {"seed": 1.5},
+        {"seed": True},
+        {"stop": ()},
+        {"stop": ("",)},
+        {"response_format": []},
+        {"stream_options": []},
+        {"service_tier": ""},
+        {"user": ""},
+    ]
+    for override in invalid_overrides:
+        with pytest.raises(ValueError):
+            options(**override)
+
+
 def test_adapter_accumulates_streaming_delta_content():
     client = FakeOpenAIClient(chunks=[chunk(VALID_ACTION_TEXT[:20]), chunk(None), chunk(VALID_ACTION_TEXT[20:])])
 

@@ -35,6 +35,7 @@
 | `P2-001-evidence-mapping-artifact-hash-hardening-plan.md` | 2026-06-07 | 已实施 P2-001 event stream / evidence mapping（事件流 / 证据映射）和 artifact hash（产物哈希）硬化，保留为 TDD 实施记录 |
 | `P2-002-real-provider-minimal-integration-gate-plan.md` | 2026-06-07 | 已实施 P2-002 real provider minimal integration gate（真实模型供应商最小集成门禁），保留为 TDD 实施记录 |
 | `P2-004-real-provider-tool-success-gate-plan.md` | 2026-06-07 | 已实施 P2-004 real provider tool success gate（真实供应商工具成功门禁），保留为 TDD 实施记录 |
+| `P2-005-openai-compatible-provider-options-hardening-plan.md` | 2026-06-08 | 已实施 P2-005 OpenAI-compatible provider options hardening（OpenAI 兼容供应商参数硬化），保留为 TDD 实施记录 |
 
 ## 5. Update Rules
 

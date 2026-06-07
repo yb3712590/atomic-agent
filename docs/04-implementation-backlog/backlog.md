@@ -79,7 +79,7 @@ Conclusion（结论）：
 | P2-002 | 建立 real provider minimal integration gate（真实模型供应商最小集成门禁） | completed | `P2-002-real-provider-minimal-integration-gate-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
 | P2-003 | 设计 external coding agent bridge（外部编码智能体桥接）的证据导入协议和权限边界 | deferred | `roadmap.md`, `0002-use-provider-agnostic-action-protocol.md`, `0003-use-fail-closed-permission-model.md` |
 | P2-004 | 建立 real provider tool success gate（真实供应商工具成功门禁） | completed | `P2-004-real-provider-tool-success-gate-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
-| P2-005 | 强化 OpenAI-compatible provider options（OpenAI 兼容供应商参数）显式配置 | pending | `P2-005-openai-compatible-provider-options-hardening-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
+| P2-005 | 强化 OpenAI-compatible provider options（OpenAI 兼容供应商参数）显式配置 | completed | `P2-005-openai-compatible-provider-options-hardening-spec.md`, `testing-strategy.md`, `agent-action-protocol.md`, `mvp-acceptance.md`, `roadmap.md` |
 | P2-006 | 建立 complex real provider atomic task gate（复杂真实供应商原子任务门禁） | pending | `P2-006-complex-real-provider-atomic-task-gate-spec.md`, `P2-005-openai-compatible-provider-options-hardening-spec.md`, `testing-strategy.md`, `mvp-acceptance.md`, `roadmap.md` |
 
 Dependency notes（依赖说明）：

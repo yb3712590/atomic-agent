@@ -13,6 +13,9 @@ class OpenAICompatibleProviderError(RuntimeError):
     pass
 
 
+_REASONING_EFFORT_VALUES = {"none", "minimal", "low", "medium", "high", "xhigh"}
+
+
 @dataclass(frozen=True)
 class OpenAICompatibleProviderOptions:
     base_url: str
@@ -24,6 +27,16 @@ class OpenAICompatibleProviderOptions:
     total_timeout_seconds: float
     temperature: float | None = None
     provider_label: str | None = None
+    reasoning_effort: str | None = None
+    top_p: float | None = None
+    presence_penalty: float | None = None
+    frequency_penalty: float | None = None
+    seed: int | None = None
+    stop: tuple[str, ...] | None = None
+    response_format: dict[str, Any] | None = None
+    stream_options: dict[str, Any] | None = None
+    service_tier: str | None = None
+    user: str | None = None
 
     def __post_init__(self) -> None:
         _require_non_empty_string(self.base_url, "base_url")
@@ -39,6 +52,58 @@ class OpenAICompatibleProviderOptions:
             _require_finite_number(self.temperature, "temperature")
         if self.provider_label is not None:
             _require_non_empty_string(self.provider_label, "provider_label")
+        if self.reasoning_effort is not None:
+            _require_reasoning_effort(self.reasoning_effort)
+        if self.top_p is not None:
+            _require_finite_number(self.top_p, "top_p")
+        if self.presence_penalty is not None:
+            _require_finite_number(self.presence_penalty, "presence_penalty")
+        if self.frequency_penalty is not None:
+            _require_finite_number(self.frequency_penalty, "frequency_penalty")
+        if self.seed is not None:
+            _require_int(self.seed, "seed")
+        if self.stop is not None:
+            _require_stop_sequences(self.stop)
+        if self.response_format is not None:
+            _require_dict(self.response_format, "response_format")
+        if self.stream_options is not None:
+            _require_dict(self.stream_options, "stream_options")
+        if self.service_tier is not None:
+            _require_non_empty_string(self.service_tier, "service_tier")
+        if self.user is not None:
+            _require_non_empty_string(self.user, "user")
+
+    def to_provider_profile(self) -> dict[str, Any]:
+        profile: dict[str, Any] = {
+            "provider": "openai-compatible",
+            "model": self.model,
+            "context_window_tokens": self.context_window_tokens,
+            "max_output_tokens": self.max_output_tokens,
+            "stream_idle_timeout_seconds": self.stream_idle_timeout_seconds,
+            "total_timeout_seconds": self.total_timeout_seconds,
+        }
+        if self.provider_label is not None:
+            profile["provider_label"] = self.provider_label
+        else:
+            profile["base_url"] = self.base_url
+        optional_fields = {
+            "temperature": self.temperature,
+            "reasoning_effort": self.reasoning_effort,
+            "top_p": self.top_p,
+            "presence_penalty": self.presence_penalty,
+            "frequency_penalty": self.frequency_penalty,
+            "seed": self.seed,
+            "response_format": self.response_format,
+            "stream_options": self.stream_options,
+            "service_tier": self.service_tier,
+            "user": self.user,
+        }
+        for key, value in optional_fields.items():
+            if value is not None:
+                profile[key] = value
+        if self.stop is not None:
+            profile["stop"] = list(self.stop)
+        return profile
 
 
 class OpenAICompatibleProviderAdapter:
@@ -99,8 +164,23 @@ class OpenAICompatibleProviderAdapter:
             "stream": True,
             "max_tokens": self.options.max_output_tokens,
         }
-        if self.options.temperature is not None:
-            payload["temperature"] = self.options.temperature
+        optional_fields = {
+            "temperature": self.options.temperature,
+            "reasoning_effort": self.options.reasoning_effort,
+            "top_p": self.options.top_p,
+            "presence_penalty": self.options.presence_penalty,
+            "frequency_penalty": self.options.frequency_penalty,
+            "seed": self.options.seed,
+            "response_format": self.options.response_format,
+            "stream_options": self.options.stream_options,
+            "service_tier": self.options.service_tier,
+            "user": self.options.user,
+        }
+        for key, value in optional_fields.items():
+            if value is not None:
+                payload[key] = value
+        if self.options.stop is not None:
+            payload["stop"] = list(self.options.stop)
         return payload
 
     def _messages(self, context: ProviderContext) -> list[dict[str, str]]:
@@ -186,6 +266,29 @@ class OpenAICompatibleProviderAdapter:
 def _require_non_empty_string(value: object, field_name: str) -> None:
     if not isinstance(value, str) or value == "":
         raise ValueError(f"{field_name} must be a non-empty string")
+
+
+def _require_reasoning_effort(value: object) -> None:
+    if not isinstance(value, str) or value not in _REASONING_EFFORT_VALUES:
+        allowed = ", ".join(sorted(_REASONING_EFFORT_VALUES))
+        raise ValueError(f"reasoning_effort must be one of: {allowed}")
+
+
+def _require_int(value: object, field_name: str) -> None:
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ValueError(f"{field_name} must be an integer")
+
+
+def _require_stop_sequences(value: object) -> None:
+    if not isinstance(value, tuple) or not value:
+        raise ValueError("stop must be a non-empty tuple of non-empty strings")
+    for item in value:
+        _require_non_empty_string(item, "stop item")
+
+
+def _require_dict(value: object, field_name: str) -> None:
+    if not isinstance(value, dict):
+        raise ValueError(f"{field_name} must be a JSON object")
 
 
 def _require_positive_int(value: object, field_name: str) -> None:

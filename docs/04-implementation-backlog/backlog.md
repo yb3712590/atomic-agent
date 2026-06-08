@@ -90,22 +90,22 @@ Dependency notes（依赖说明）：
 - P2-004 should run after P2-002 because it tightens real provider validation from fail-closed acceptance（失败关闭验收） to success-only tool coverage（成功型工具覆盖）; it must remain manual/nightly and must not enter base CI（基础持续集成）.
 - P2-005 should run after P2-004 because the next real provider gates need explicit high-impact provider options（高影响供应商参数）, especially `reasoning_effort`（推理强度）, without hardcoded configurable options（硬编码可配置项） or silent fallback（静默降级）.
 - P2-006 should run after P2-005 because the complex real provider atomic task gate（复杂真实供应商原子任务门禁） should use the explicit provider option path, including `reasoning_effort=high`, and record those options in evidence/audit（证据/审计） context.
+- P2-003 remains deferred optional（延后可选） after P2 Exit Gate. External coding agent bridge（外部编码智能体桥接） is a backup extension, not a prerequisite for current atomic task runtime readiness（原子任务运行时就绪）. It should be reactivated only by a later explicit roadmap review（路线图复审） or user decision.
 - Earlier deferred ideas such as native tool calling adapter（原生工具调用适配器） and service runner / HTTP probe（服务运行与 HTTP 探测） are not removed from the roadmap; they are not part of the immediate P2 batch unless a later roadmap review re-prioritizes them.
 
-### P2 Exit Gate: Roadmap Review
+### P2 Exit Gate: Atomic Task Runtime Readiness Review
 
-Trigger（触发条件）：
+Status（状态）：completed
 
-- P2 表中所有非 deferred（延后）任务均为 completed，或 deferred 项经 roadmap review 明确继续延期。
-- P2 相关 extension（扩展）、security boundary（安全边界）和 evidence（证据）导入路径已验证。
+Review record（复审记录）：`docs/07-project-log/2026-06-08-P2-exit-review.md`
 
-Required outputs（必需产物）：
+Conclusion（结论）：
 
-1. 对照 `docs/06-roadmap/roadmap.md`，判断 M4/M5 哪些条目已满足、部分满足或失效。
-2. 判断 M5 是否仍是 current planned endpoint（当前规划终点）。
-3. 如继续扩展，编制新的 P wave；如不继续扩展，记录项目当前完成边界。
-4. 如长期路线、项目边界或架构原则变化，先新增或更新 ADR。
-5. 必要时写入 `docs/07-project-log/`。
+- M4 exit criteria（M4 退出标准）已满足：event stream / evidence mapping（事件流 / 证据映射）、artifact hash（产物哈希）、workspace mutation lineage（工作区变更谱系）和 command artifact hash（命令产物哈希）已有验证路径。
+- 当前 bounded runtime readiness（有界运行时就绪）已满足：Boardroom OS 可将 ticket package（工单包）编译为完整 `AgentInvocation`（智能体调用请求），atomic-agent 通过 `AgentRuntimePort`（智能体运行时端口）执行 atomic task（原子任务）并返回可审计 `AgentRunResult`（智能体运行结果）。
+- `ExecutionPackage -> AgentInvocation`（执行包到智能体调用请求）编译职责属于 Boardroom OS 或上层编排系统，不下沉到 atomic-agent 当前边界。
+- M5 external coding agent bridge（外部编码智能体桥接）继续 deferred optional（延后可选），作为备用扩展，不阻塞当前 readiness。
+- 本复审不开启 P3 execution wave（P3 执行波次）。
 
 ## Blocked Items
 

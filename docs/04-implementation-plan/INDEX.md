@@ -37,6 +37,7 @@
 | `P2-004-real-provider-tool-success-gate-plan.md` | 2026-06-07 | 已实施 P2-004 real provider tool success gate（真实供应商工具成功门禁），保留为 TDD 实施记录 |
 | `P2-005-openai-compatible-provider-options-hardening-plan.md` | 2026-06-08 | 已实施 P2-005 OpenAI-compatible provider options hardening（OpenAI 兼容供应商参数硬化），保留为 TDD 实施记录 |
 | `P2-006-complex-real-provider-atomic-task-gate-plan.md` | 2026-06-08 | 已实施 P2-006 complex real provider atomic task gate（复杂真实供应商原子任务门禁），保留为 TDD 实施记录 |
+| `P2-exit-gate-atomic-task-runtime-readiness-review-plan.md` | 2026-06-08 | 已实施 P2 Exit Gate（P2 退出门禁）原子任务运行时就绪复审、文档治理收尾和不进入 P3 的边界判断，保留为阶段门禁实施记录 |
 
 ## 5. Update Rules
 

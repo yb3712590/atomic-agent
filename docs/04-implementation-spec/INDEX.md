@@ -14,7 +14,6 @@
 |---|---|---|---|
 | `INDEX.md` | active | 本目录索引和文档治理规则 | 进入本目录前 |
 | `mvp-runtime-spec.md` | active | 定义 MVP runtime 的工具、策略、事件、provider、配置来源和输出要求 | 实现或调整 MVP 范围前 |
-| `P2-006-complex-real-provider-atomic-task-gate-spec.md` | draft | 定义 P2-006 complex real provider atomic task gate（复杂真实供应商原子任务门禁）的范围和验收标准 | 细化 P2-006 plan 或实施前 |
 
 ## 4. Completed / Archived Documents
 
@@ -37,6 +36,7 @@
 | `P2-002-real-provider-minimal-integration-gate-spec.md` | 2026-06-07 | 已实现 P2-002 real provider minimal integration gate（真实模型供应商最小集成门禁），保留为真实供应商集成门禁规格记录 |
 | `P2-004-real-provider-tool-success-gate-spec.md` | 2026-06-07 | 已实现 P2-004 real provider tool success gate（真实供应商工具成功门禁），保留为成功型真实供应商门禁规格记录 |
 | `P2-005-openai-compatible-provider-options-hardening-spec.md` | 2026-06-08 | 已实现 P2-005 OpenAI-compatible provider options hardening（OpenAI 兼容供应商参数硬化），保留为真实供应商参数硬化规格记录 |
+| `P2-006-complex-real-provider-atomic-task-gate-spec.md` | 2026-06-08 | 已实现 P2-006 complex real provider atomic task gate（复杂真实供应商原子任务门禁），保留为真实供应商复杂原子任务门禁规格记录 |
 
 ## 5. Update Rules
 

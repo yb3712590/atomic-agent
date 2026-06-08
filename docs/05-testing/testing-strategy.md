@@ -207,6 +207,53 @@ P2-004 success-only cases（成功型用例）覆盖：
 
 每个 case 必须验证 event stream integrity（事件流完整性）和 evidence summary（证据摘要）；涉及 produced path（产出路径）的 case 必须验证 source inventory lineage（源码清单谱系）为 `traceable`（可追溯）。`run_command` case 必须验证 `command.completed` exit code（退出码）为 `0`，且 stdout/stderr artifacts（标准输出/错误产物）带 sha256。
 
+P2-006 adds a separate default-disabled `real_provider_complex_task` marker（复杂真实供应商原子任务标记）. It is a success-only manual/nightly gate（只接受成功的手动/夜间门禁） that asks a real provider（真实供应商） to repair one small broken Python report project（破损 Python 报告项目）, run declared commands（声明命令）, produce workspace outputs（工作区产物）, and submit auditable evidence（可审计证据）.
+
+默认命令：
+
+```bash
+python -m pytest tests/test_real_provider_complex_task.py -q
+```
+
+默认结果必须 skip（跳过）the real provider integration test（真实供应商集成测试）and must not make a provider network call（供应商网络调用）, because it is not enabled unless:
+
+```text
+ATOMIC_AGENT_RUN_REAL_PROVIDER_COMPLEX_TASK=1
+```
+
+显式启用命令可复用 P2-005 provider options（供应商参数）：
+
+```bash
+ATOMIC_AGENT_RUN_REAL_PROVIDER_COMPLEX_TASK=1 \
+ATOMIC_AGENT_REAL_PROVIDER_BASE_URL="https://provider.example/v1" \
+ATOMIC_AGENT_REAL_PROVIDER_API_KEY="replace-with-real-key" \
+ATOMIC_AGENT_REAL_PROVIDER_MODEL="provider-model" \
+ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT=high \
+python -m pytest tests/test_real_provider_complex_task.py -m real_provider_complex_task -q
+```
+
+Required env vars（必需环境变量）：
+
+```text
+ATOMIC_AGENT_RUN_REAL_PROVIDER_COMPLEX_TASK=1
+ATOMIC_AGENT_REAL_PROVIDER_BASE_URL
+ATOMIC_AGENT_REAL_PROVIDER_API_KEY
+ATOMIC_AGENT_REAL_PROVIDER_MODEL
+```
+
+Recommended explicit defaults（建议显式默认值）：
+
+```text
+ATOMIC_AGENT_REAL_PROVIDER_MAX_STEPS=100
+ATOMIC_AGENT_REAL_PROVIDER_TOTAL_TIMEOUT_SECONDS=600
+ATOMIC_AGENT_REAL_PROVIDER_STREAM_IDLE_TIMEOUT_SECONDS=30
+ATOMIC_AGENT_REAL_PROVIDER_REASONING_EFFORT=high
+```
+
+Success requires `run.completed`（运行完成）, event stream integrity（事件流完整性）, at least one provider turn（供应商轮次）, required tool coverage（工具覆盖）, `run-tests` failing then passing, `validate-report` passing, traceable produced paths（可追溯产出路径）, command stdout/stderr artifact sha256（命令输出产物哈希）, and no mutation under `work/tests/`, `work/expected/`, or `work/data/`.
+
+Provider failure（供应商失败）, parse failure（解析失败）, permission denied（权限拒绝）, tool failure（工具失败）, missing credentials（缺失凭据）, auth/network failure（认证/网络失败）, or unsupported explicit provider options（不支持显式供应商参数） cannot pass this gate. The gate is costlier and more variable than P2-004, so it remains manual/nightly and must not enter base CI（基础持续集成）. If only the default skip and local harness tests pass, P2-006 gate scaffold（门禁脚手架） is ready but the backlog（待办） must remain pending（待处理） until the explicit real provider gate passes.
+
 ## Test Data Rules
 
 - 测试 fixture（测试夹具）必须清晰标记 fake 或 real。

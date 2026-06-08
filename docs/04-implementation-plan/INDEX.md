@@ -36,6 +36,7 @@
 | `P2-002-real-provider-minimal-integration-gate-plan.md` | 2026-06-07 | 已实施 P2-002 real provider minimal integration gate（真实模型供应商最小集成门禁），保留为 TDD 实施记录 |
 | `P2-004-real-provider-tool-success-gate-plan.md` | 2026-06-07 | 已实施 P2-004 real provider tool success gate（真实供应商工具成功门禁），保留为 TDD 实施记录 |
 | `P2-005-openai-compatible-provider-options-hardening-plan.md` | 2026-06-08 | 已实施 P2-005 OpenAI-compatible provider options hardening（OpenAI 兼容供应商参数硬化），保留为 TDD 实施记录 |
+| `P2-006-complex-real-provider-atomic-task-gate-plan.md` | 2026-06-08 | 已实施 P2-006 complex real provider atomic task gate（复杂真实供应商原子任务门禁），保留为 TDD 实施记录 |
 
 ## 5. Update Rules
 

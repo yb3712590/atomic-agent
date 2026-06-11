@@ -103,7 +103,7 @@ def test_parse_agent_turn_rejects_bare_json_array():
     assert error.value.kind == "invalid_action_batch"
 
 
-def test_parse_agent_turn_rejects_concatenated_json_objects():
+def test_parse_agent_turn_accepts_concatenated_json_objects_and_uses_last():
     first = json.dumps(
         {
             "action_id": "step-0001",
@@ -121,8 +121,24 @@ def test_parse_agent_turn_rejects_concatenated_json_objects():
         }
     )
 
+    parsed = parse_agent_turn(first + second)
+
+    assert parsed.protocol == "agent-action-v1"
+    assert [action.action_id for action in parsed.actions] == ["step-0002"]
+
+
+def test_parse_agent_turn_rejects_concatenated_json_with_invalid_tail():
+    first = json.dumps(
+        {
+            "action_id": "step-0001",
+            "action": "write_file",
+            "reason_summary": "Create file.",
+            "input": {"path": "work/a.txt", "content": "hello"},
+        }
+    )
+
     with pytest.raises(ActionParseError, match="valid JSON") as error:
-        parse_agent_turn(first + second)
+        parse_agent_turn(first + '{"action_id":')
 
     assert error.value.kind == "invalid_json"
 

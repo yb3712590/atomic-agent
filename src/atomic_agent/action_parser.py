@@ -29,10 +29,7 @@ def parse_agent_action(provider_output: str) -> AgentAction:
 
 
 def parse_agent_turn(provider_output: str) -> ParsedAgentTurn:
-    try:
-        parsed: Any = json.loads(provider_output)
-    except json.JSONDecodeError as error:
-        raise ActionParseError("invalid_json", "Provider output must be valid JSON.") from error
+    parsed = _load_last_provider_json_object(provider_output)
 
     if isinstance(parsed, list):
         raise ActionParseError(
@@ -65,3 +62,24 @@ def parse_agent_turn(provider_output: str) -> ParsedAgentTurn:
     except ValidationError as error:
         raise ActionParseError("schema_validation_failed", str(error)) from error
     return ParsedAgentTurn(protocol="agent-action-v1", actions=[action])
+
+
+def _load_last_provider_json_object(provider_output: str) -> Any:
+    decoder = json.JSONDecoder()
+    objects: list[Any] = []
+    position = 0
+    while position < len(provider_output):
+        while position < len(provider_output) and provider_output[position].isspace():
+            position += 1
+        if position >= len(provider_output):
+            break
+        try:
+            parsed, end = decoder.raw_decode(provider_output, position)
+        except json.JSONDecodeError as error:
+            raise ActionParseError("invalid_json", "Provider output must be valid JSON.") from error
+        objects.append(parsed)
+        position = end
+
+    if not objects:
+        raise ActionParseError("invalid_json", "Provider output must be valid JSON.")
+    return objects[-1]

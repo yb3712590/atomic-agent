@@ -149,7 +149,7 @@ def read_jsonl(path: Path):
     return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
-def make_invocation(tmp_path, tools=None, budgets=None, allowed_write_set=None):
+def make_invocation(tmp_path, tools=None, budgets=None, allowed_write_set=None, output_requirements=None):
     return AgentInvocation(
         invocation_id="inv_001",
         task="Create a fixed output file through a controlled loop.",
@@ -174,16 +174,23 @@ def make_invocation(tmp_path, tools=None, budgets=None, allowed_write_set=None):
             "max_observation_chars": 10000,
             "max_wall_seconds": 30.0,
         },
-        output_requirements={"summary": True, "event_stream": True},
+        output_requirements=output_requirements or {"summary": True, "event_stream": True},
     )
 
 
-def make_loop(tmp_path, provider, runtime_clock=None, web_fetch_tools=None, command_tools=_USE_DEFAULT_COMMAND_TOOLS):
+def make_loop(
+    tmp_path,
+    provider,
+    runtime_clock=None,
+    web_fetch_tools=None,
+    command_tools=_USE_DEFAULT_COMMAND_TOOLS,
+    allowed_write_set=None,
+):
     event_dir = tmp_path / "events"
     event_dir.mkdir()
     artifact_dir = tmp_path / "artifacts"
     artifact_dir.mkdir()
-    guard = WorkspacePathGuard(tmp_path, allowed_write_set=["work/"])
+    guard = WorkspacePathGuard(tmp_path, allowed_write_set=allowed_write_set or ["work/"])
     filesystem_tools = FilesystemTools(
         guard,
         FilesystemToolConfig(
@@ -304,6 +311,329 @@ def test_agent_loop_runs_multistep_fake_provider_to_submit_result(tmp_path):
     event_types = [event["type"] for event in read_jsonl(event_stream_path)]
     assert event_types[0] == "run.started"
     assert event_types[-2:] == ["result.submitted", "run.completed"]
+
+
+def test_agent_loop_executes_batch_actions_in_order(tmp_path):
+    provider = ScriptedProvider(
+        [
+            json.dumps(
+                {
+                    "batch_id": "batch-0001",
+                    "protocol": "agent-action-batch-v1",
+                    "reason_summary": "Create, check, and submit.",
+                    "actions": [
+                        {
+                            "action_id": "step-0001",
+                            "action": "write_file",
+                            "reason_summary": "Create output.",
+                            "input": {"path": "work/output.txt", "content": "fixed"},
+                        },
+                        {
+                            "action_id": "step-0002",
+                            "action": "run_command",
+                            "reason_summary": "Run declared check.",
+                            "input": {"command_id": "check-output"},
+                        },
+                        {
+                            "action_id": "step-0003",
+                            "action": "submit_result",
+                            "reason_summary": "Submit checked output.",
+                            "input": {
+                                "summary": "done",
+                                "produced_paths": ["work/output.txt"],
+                                "evidence_refs": ["check-output"],
+                            },
+                        },
+                    ],
+                }
+            )
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        tools=["write_file", "run_command", "submit_result"],
+        budgets={
+            "max_steps": 5,
+            "max_parse_failures": 0,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+            "max_actions_per_turn": 4,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.COMPLETED
+    events = read_jsonl(event_stream_path)
+    assert [event["type"] for event in events].count("action.parsed") == 3
+    assert any(
+        event["type"] == "command.completed" and event["payload"]["command_id"] == "check-output"
+        for event in events
+    )
+    parsed_actions = [event["payload"]["action"] for event in events if event["type"] == "action.parsed"]
+    assert [action["action_id"] for action in parsed_actions] == ["step-0001", "step-0002", "step-0003"]
+    assert {action["batch_id"] for action in parsed_actions} == {"batch-0001"}
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_rejects_batch_over_action_limit(tmp_path):
+    provider = ScriptedProvider(
+        [
+            json.dumps(
+                {
+                    "batch_id": "batch-0001",
+                    "protocol": "agent-action-batch-v1",
+                    "reason_summary": "Too many actions.",
+                    "actions": [
+                        {
+                            "action_id": "step-0001",
+                            "action": "write_file",
+                            "reason_summary": "A.",
+                            "input": {"path": "work/a.txt", "content": "a"},
+                        },
+                        {
+                            "action_id": "step-0002",
+                            "action": "write_file",
+                            "reason_summary": "B.",
+                            "input": {"path": "work/b.txt", "content": "b"},
+                        },
+                    ],
+                }
+            )
+        ]
+    )
+    loop, _ = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        tools=["write_file", "submit_result"],
+        budgets={
+            "max_steps": 5,
+            "max_parse_failures": 0,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+            "max_actions_per_turn": 1,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "action_parse_failed"
+    assert not (tmp_path / "work" / "a.txt").exists()
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_stops_batch_on_policy_denied(tmp_path):
+    provider = ScriptedProvider(
+        [
+            json.dumps(
+                {
+                    "batch_id": "batch-0001",
+                    "protocol": "agent-action-batch-v1",
+                    "reason_summary": "Second action escapes.",
+                    "actions": [
+                        {
+                            "action_id": "step-0001",
+                            "action": "write_file",
+                            "reason_summary": "Allowed.",
+                            "input": {"path": "work/allowed/a.txt", "content": "a"},
+                        },
+                        {
+                            "action_id": "step-0002",
+                            "action": "write_file",
+                            "reason_summary": "Denied.",
+                            "input": {"path": "work/denied/b.txt", "content": "b"},
+                        },
+                        {
+                            "action_id": "step-0003",
+                            "action": "submit_result",
+                            "reason_summary": "Should not run.",
+                            "input": {
+                                "summary": "bad",
+                                "produced_paths": ["work/denied/b.txt"],
+                                "evidence_refs": [],
+                            },
+                        },
+                    ],
+                }
+            )
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider, allowed_write_set=["work/allowed/"])
+    invocation = make_invocation(
+        tmp_path,
+        allowed_write_set=["work/allowed/"],
+        tools=["write_file", "submit_result"],
+        budgets={
+            "max_steps": 5,
+            "max_parse_failures": 0,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+            "max_actions_per_turn": 3,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "policy_denied"
+    events = read_jsonl(event_stream_path)
+    parsed_ids = [event["payload"]["action"]["action_id"] for event in events if event["type"] == "action.parsed"]
+    assert parsed_ids == ["step-0001", "step-0002"]
+    assert (tmp_path / "work" / "allowed" / "a.txt").exists()
+    assert not (tmp_path / "work" / "denied" / "b.txt").exists()
+
+
+def test_agent_loop_runs_required_output_checkpoint_when_paths_exist(tmp_path):
+    provider = ScriptedProvider(
+        [
+            json.dumps(
+                {
+                    "batch_id": "batch-0001",
+                    "protocol": "agent-action-batch-v1",
+                    "reason_summary": "Create required outputs.",
+                    "actions": [
+                        {
+                            "action_id": "step-0001",
+                            "action": "write_file",
+                            "reason_summary": "A.",
+                            "input": {"path": "work/a.txt", "content": "a"},
+                        },
+                        {
+                            "action_id": "step-0002",
+                            "action": "write_file",
+                            "reason_summary": "B.",
+                            "input": {"path": "work/b.txt", "content": "b"},
+                        },
+                    ],
+                }
+            ),
+            json.dumps(
+                {
+                    "action_id": "step-0003",
+                    "action": "submit_result",
+                    "reason_summary": "Submit after checkpoint.",
+                    "input": {
+                        "summary": "done",
+                        "produced_paths": ["work/a.txt", "work/b.txt"],
+                        "evidence_refs": ["check-output"],
+                    },
+                }
+            ),
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        tools=["write_file", "submit_result"],
+        output_requirements={
+            "summary": True,
+            "event_stream": True,
+            "required_output_checkpoint": {
+                "when_all_paths_exist": ["work/a.txt", "work/b.txt"],
+                "run_command_id": "check-output",
+                "max_auto_runs": 1,
+            },
+        },
+        budgets={
+            "max_steps": 5,
+            "max_parse_failures": 0,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+            "max_actions_per_turn": 2,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.COMPLETED
+    events = read_jsonl(event_stream_path)
+    assert any(
+        event["type"] == "command.completed" and event["payload"]["command_id"] == "check-output"
+        for event in events
+    )
+    assert len(provider.contexts) == 2
+    assert provider.contexts[1].observations[-1]["tool"] == "run_command"
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_rejects_checkpoint_for_undeclared_command(tmp_path):
+    command_tools = CommandTools(
+        WorkspacePathGuard(tmp_path, allowed_write_set=["work/"]),
+        CommandPolicy(
+            {
+                "declared": CommandSpec(
+                    argv=(str(PYTHON), "-c", "raise SystemExit(0)"),
+                )
+            }
+        ),
+        CommandToolConfig(default_timeout_seconds=2.0, max_timeout_seconds=5.0, max_output_bytes=4096),
+    )
+    provider = ScriptedProvider([])
+    loop, _ = make_loop(tmp_path, provider, command_tools=command_tools)
+    invocation = make_invocation(
+        tmp_path,
+        output_requirements={
+            "summary": True,
+            "event_stream": True,
+            "required_output_checkpoint": {
+                "when_all_paths_exist": ["work/a.txt"],
+                "run_command_id": "missing",
+                "max_auto_runs": 1,
+            },
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "invalid_invocation"
+
+
+@pytest.mark.permission_negative
+def test_agent_loop_does_not_auto_submit_after_checkpoint_passes(tmp_path):
+    provider = ScriptedProvider(
+        [
+            json.dumps(
+                {
+                    "action_id": "step-0001",
+                    "action": "write_file",
+                    "reason_summary": "A.",
+                    "input": {"path": "work/output.txt", "content": "fixed"},
+                }
+            )
+        ]
+    )
+    loop, event_stream_path = make_loop(tmp_path, provider)
+    invocation = make_invocation(
+        tmp_path,
+        tools=["write_file", "submit_result"],
+        output_requirements={
+            "summary": True,
+            "event_stream": True,
+            "required_output_checkpoint": {
+                "when_all_paths_exist": ["work/output.txt"],
+                "run_command_id": "check-output",
+                "max_auto_runs": 1,
+            },
+        },
+        budgets={
+            "max_steps": 1,
+            "max_parse_failures": 0,
+            "max_observation_chars": 10000,
+            "max_wall_seconds": 30.0,
+            "max_actions_per_turn": 1,
+        },
+    )
+
+    result = loop.run(invocation)
+
+    assert result.status == AgentRunStatus.FAILED
+    assert result.failure_kind == "max_steps_exceeded"
+    events = read_jsonl(event_stream_path)
+    assert any(event["type"] == "command.completed" for event in events)
+    assert "result.submitted" not in [event["type"] for event in events]
 
 
 def test_agent_loop_records_auditable_event_stream_details(tmp_path):

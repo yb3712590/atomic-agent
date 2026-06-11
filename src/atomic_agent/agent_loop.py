@@ -1,14 +1,15 @@
 from dataclasses import dataclass, field
 import json
 import math
+from pathlib import Path
 from typing import Any, Callable, Literal, Protocol
 
-from atomic_agent.action_parser import ActionParseError, parse_agent_action
+from atomic_agent.action_parser import ActionParseError, parse_agent_turn
 from atomic_agent.artifacts import ArtifactWriter
 from atomic_agent.command_tools import CommandPolicy, CommandToolResult, CommandTools, execute_command_action
 from atomic_agent.event_recorder import EventError, EventRecorder
 from atomic_agent.filesystem_tools import FileToolResult, FilesystemTools, execute_filesystem_action
-from atomic_agent.models import AgentAction, AgentActionType, AgentInvocation, AgentRunResult, AgentRunStatus
+from atomic_agent.models import AgentAction, AgentActionType, AgentInvocation, AgentRunResult, AgentRunStatus, ParsedAgentTurn
 from atomic_agent.path_guard import PathDecisionType
 from atomic_agent.web_fetch_tools import WebFetchToolResult, WebFetchTools, execute_web_fetch_action
 
@@ -69,6 +70,15 @@ class _RunState:
     workspace_mutations: list[dict[str, Any]] = field(default_factory=list)
     artifacts: list[dict[str, Any]] = field(default_factory=list)
     parse_failures: int = 0
+    tool_attempt_sequence: int = 0
+    checkpoint_run_counts: dict[str, int] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class _RequiredOutputCheckpoint:
+    when_all_paths_exist: tuple[str, ...]
+    run_command_id: str
+    max_auto_runs: int
 
 
 @dataclass(frozen=True)
@@ -78,6 +88,14 @@ class _RuntimeRequirements:
     max_parse_failures: int
     max_observation_chars: int
     max_wall_seconds: float
+    max_actions_per_turn: int
+    required_output_checkpoint: _RequiredOutputCheckpoint | None = None
+
+
+@dataclass(frozen=True)
+class _ActionExecutionOutcome:
+    terminal_result: AgentRunResult | None = None
+    failure: tuple[str, str, str | None] | None = None
 
 
 class AgentLoop:
@@ -147,7 +165,7 @@ class AgentLoop:
                 return self._fail(state, *wall_time_error)
 
             try:
-                action = parse_agent_action(provider_output)
+                turn = parse_agent_turn(provider_output)
             except ActionParseError as error:
                 state.parse_failures += 1
                 can_retry = state.parse_failures <= requirements.max_parse_failures
@@ -170,61 +188,30 @@ class AgentLoop:
                 )
                 continue
 
-            self.dependencies.event_recorder.record_action_parsed(action.model_dump(mode="json"))
-            decision = self._decide_permission(invocation, requirements, action)
-            self.dependencies.event_recorder.record_permission_decided(
-                action.action_id,
-                decision.decision,
-                decision.policy_ref,
-                decision.reason,
-            )
-            if decision.decision == "deny":
-                self.dependencies.event_recorder.record_action_rejected(
-                    EventError("policy_denied", decision.reason, retryable=False, related_ref=action.action_id).to_payload()
+            if len(turn.actions) > requirements.max_actions_per_turn:
+                message = (
+                    f"batch contains {len(turn.actions)} actions, "
+                    f"limit is {requirements.max_actions_per_turn}"
                 )
-                return self._fail(state, "policy_denied", decision.reason, action.action_id)
-            wall_time_error = self._check_wall_time_budget(
-                started_at,
-                requirements,
-                "max_wall_seconds exceeded before action execution",
-                action.action_id,
-            )
-            if wall_time_error is not None:
-                return self._fail(state, *wall_time_error)
+                self.dependencies.event_recorder.record_action_rejected(
+                    EventError("too_many_actions", message, retryable=False, related_ref=provider_turn_id).to_payload()
+                )
+                return self._fail(state, "action_parse_failed", message, provider_turn_id)
 
-            if action.action == AgentActionType.SUBMIT_RESULT:
-                submission_error = self._validate_result_submission(action)
-                if submission_error is not None:
-                    self.dependencies.event_recorder.record_action_rejected(
-                        EventError(
-                            "invalid_result_submission",
-                            submission_error,
-                            retryable=False,
-                            related_ref=action.action_id,
-                        ).to_payload()
-                    )
-                    return self._fail(state, "tool_failed", submission_error, action.action_id)
-                return self._submit_result(state, action)
-
-            tool_attempt_id = f"tool_attempt_{step:06d}"
-            self.dependencies.event_recorder.record_tool_attempt_started(
-                tool_attempt_id,
-                action.action_id,
-                action.action.value,
-            )
-            result = self._execute_tool_action(action)
-            self._record_tool_result(state, requirements, action, tool_attempt_id, result)
-            wall_time_error = self._check_wall_time_budget(
-                started_at,
-                requirements,
-                "max_wall_seconds exceeded after tool execution",
-                action.action_id,
-            )
-            if wall_time_error is not None:
-                return self._fail(state, *wall_time_error)
-            if not result.ok:
-                message = result.error_message or "tool action failed"
-                return self._fail(state, "tool_failed", message, action.action_id)
+            for action_index, action in enumerate(turn.actions):
+                outcome = self._execute_parsed_action(
+                    invocation=invocation,
+                    requirements=requirements,
+                    state=state,
+                    action=action,
+                    turn=turn,
+                    action_index=action_index,
+                    started_at=started_at,
+                )
+                if outcome.terminal_result is not None:
+                    return outcome.terminal_result
+                if outcome.failure is not None:
+                    return self._fail(state, *outcome.failure)
 
         return self._fail(
             state=state,
@@ -241,6 +228,10 @@ class AgentLoop:
         max_parse_failures = invocation.budgets.get("max_parse_failures")
         max_observation_chars = invocation.budgets.get("max_observation_chars")
         max_wall_seconds = invocation.budgets.get("max_wall_seconds")
+        max_actions_per_turn = invocation.budgets.get("max_actions_per_turn", 1)
+        checkpoint_or_error = self._required_output_checkpoint(invocation)
+        if isinstance(checkpoint_or_error, str):
+            return checkpoint_or_error
         if not isinstance(max_steps, int) or isinstance(max_steps, bool) or max_steps <= 0:
             return "budgets.max_steps must be a positive integer"
         if not isinstance(max_parse_failures, int) or isinstance(max_parse_failures, bool) or max_parse_failures < 0:
@@ -254,6 +245,12 @@ class AgentLoop:
             or max_wall_seconds <= 0
         ):
             return "budgets.max_wall_seconds must be a finite positive number"
+        if (
+            not isinstance(max_actions_per_turn, int)
+            or isinstance(max_actions_per_turn, bool)
+            or max_actions_per_turn <= 0
+        ):
+            return "budgets.max_actions_per_turn must be a positive integer"
         if "submit_result" not in invocation.tools:
             return "invocation.tools must include submit_result"
         return _RuntimeRequirements(
@@ -262,7 +259,174 @@ class AgentLoop:
             max_parse_failures=max_parse_failures,
             max_observation_chars=max_observation_chars,
             max_wall_seconds=float(max_wall_seconds),
+            max_actions_per_turn=max_actions_per_turn,
+            required_output_checkpoint=checkpoint_or_error,
         )
+
+    def _required_output_checkpoint(self, invocation: AgentInvocation) -> _RequiredOutputCheckpoint | None | str:
+        checkpoint = invocation.output_requirements.get("required_output_checkpoint")
+        if checkpoint is None:
+            return None
+        if not isinstance(checkpoint, dict):
+            return "required_output_checkpoint must be an object"
+        paths = checkpoint.get("when_all_paths_exist")
+        command_id = checkpoint.get("run_command_id")
+        max_auto_runs = checkpoint.get("max_auto_runs")
+        if not isinstance(paths, list) or not paths or not all(isinstance(path, str) and path for path in paths):
+            return "required_output_checkpoint.when_all_paths_exist must be non-empty string paths"
+        if not isinstance(command_id, str) or not command_id:
+            return "required_output_checkpoint.run_command_id must be a non-empty string"
+        if not isinstance(max_auto_runs, int) or isinstance(max_auto_runs, bool) or max_auto_runs < 1:
+            return "required_output_checkpoint.max_auto_runs must be a positive integer"
+        if self.dependencies.command_tools is None:
+            return "required_output_checkpoint requires command_tools"
+        if self.dependencies.command_tools.policy.resolve(command_id) is None:
+            return "required_output_checkpoint.run_command_id must reference a declared command"
+        return _RequiredOutputCheckpoint(
+            when_all_paths_exist=tuple(paths),
+            run_command_id=command_id,
+            max_auto_runs=max_auto_runs,
+        )
+
+    def _execute_parsed_action(
+        self,
+        *,
+        invocation: AgentInvocation,
+        requirements: _RuntimeRequirements,
+        state: _RunState,
+        action: AgentAction,
+        turn: ParsedAgentTurn,
+        action_index: int,
+        started_at: float,
+    ) -> _ActionExecutionOutcome:
+        action_payload = action.model_dump(mode="json")
+        action_payload["protocol"] = turn.protocol
+        if turn.batch_id is not None:
+            action_payload["batch_id"] = turn.batch_id
+            action_payload["batch_index"] = action_index
+        self.dependencies.event_recorder.record_action_parsed(action_payload)
+        decision = self._decide_permission(invocation, requirements, action)
+        self.dependencies.event_recorder.record_permission_decided(
+            action.action_id,
+            decision.decision,
+            decision.policy_ref,
+            decision.reason,
+        )
+        if decision.decision == "deny":
+            self.dependencies.event_recorder.record_action_rejected(
+                EventError("policy_denied", decision.reason, retryable=False, related_ref=action.action_id).to_payload()
+            )
+            return _ActionExecutionOutcome(failure=("policy_denied", decision.reason, action.action_id))
+        wall_time_error = self._check_wall_time_budget(
+            started_at,
+            requirements,
+            "max_wall_seconds exceeded before action execution",
+            action.action_id,
+        )
+        if wall_time_error is not None:
+            return _ActionExecutionOutcome(failure=wall_time_error)
+
+        if action.action == AgentActionType.SUBMIT_RESULT:
+            submission_error = self._validate_result_submission(action)
+            if submission_error is not None:
+                self.dependencies.event_recorder.record_action_rejected(
+                    EventError(
+                        "invalid_result_submission",
+                        submission_error,
+                        retryable=False,
+                        related_ref=action.action_id,
+                    ).to_payload()
+                )
+                return _ActionExecutionOutcome(failure=("tool_failed", submission_error, action.action_id))
+            return _ActionExecutionOutcome(terminal_result=self._submit_result(state, action))
+
+        state.tool_attempt_sequence += 1
+        tool_attempt_id = f"tool_attempt_{state.tool_attempt_sequence:06d}"
+        self.dependencies.event_recorder.record_tool_attempt_started(
+            tool_attempt_id,
+            action.action_id,
+            action.action.value,
+        )
+        result = self._execute_tool_action(action)
+        self._record_tool_result(state, requirements, action, tool_attempt_id, result)
+        wall_time_error = self._check_wall_time_budget(
+            started_at,
+            requirements,
+            "max_wall_seconds exceeded after tool execution",
+            action.action_id,
+        )
+        if wall_time_error is not None:
+            return _ActionExecutionOutcome(failure=wall_time_error)
+        if not result.ok:
+            message = result.error_message or "tool action failed"
+            return _ActionExecutionOutcome(failure=("tool_failed", message, action.action_id))
+        checkpoint_outcome = self._maybe_run_required_output_checkpoint(state, requirements, started_at)
+        if checkpoint_outcome.failure is not None:
+            return checkpoint_outcome
+        return _ActionExecutionOutcome()
+
+    def _maybe_run_required_output_checkpoint(
+        self,
+        state: _RunState,
+        requirements: _RuntimeRequirements,
+        started_at: float,
+    ) -> _ActionExecutionOutcome:
+        checkpoint = requirements.required_output_checkpoint
+        if checkpoint is None:
+            return _ActionExecutionOutcome()
+        run_count = state.checkpoint_run_counts.get(checkpoint.run_command_id, 0)
+        if run_count >= checkpoint.max_auto_runs:
+            return _ActionExecutionOutcome()
+        if not self._checkpoint_paths_exist(checkpoint.when_all_paths_exist):
+            return _ActionExecutionOutcome()
+        if self.dependencies.command_tools is None:
+            return _ActionExecutionOutcome(
+                failure=("invalid_invocation", "required output checkpoint requires command_tools", None)
+            )
+
+        next_count = run_count + 1
+        state.checkpoint_run_counts[checkpoint.run_command_id] = next_count
+        action = AgentAction(
+            action_id=f"checkpoint:{checkpoint.run_command_id}:{next_count}",
+            action=AgentActionType.RUN_COMMAND,
+            reason_summary="Run required output checkpoint.",
+            input={"command_id": checkpoint.run_command_id},
+        )
+        state.tool_attempt_sequence += 1
+        tool_attempt_id = f"tool_attempt_{state.tool_attempt_sequence:06d}"
+        self.dependencies.event_recorder.record_tool_attempt_started(
+            tool_attempt_id,
+            action.action_id,
+            action.action.value,
+        )
+        result = self._execute_tool_action(action)
+        self._record_tool_result(state, requirements, action, tool_attempt_id, result)
+        wall_time_error = self._check_wall_time_budget(
+            started_at,
+            requirements,
+            "max_wall_seconds exceeded after required output checkpoint",
+            action.action_id,
+        )
+        if wall_time_error is not None:
+            return _ActionExecutionOutcome(failure=wall_time_error)
+        if not result.ok:
+            message = result.error_message or "checkpoint command failed"
+            return _ActionExecutionOutcome(failure=("tool_failed", message, action.action_id))
+        return _ActionExecutionOutcome()
+
+    def _checkpoint_paths_exist(self, paths: tuple[str, ...]) -> bool:
+        workspace_root = self.dependencies.filesystem_tools.guard.workspace_root
+        for path in paths:
+            decision = self.dependencies.filesystem_tools.guard.resolve_read_path(path)
+            if decision.decision == PathDecisionType.DENY:
+                return False
+            if not Path(decision.normalized_path).exists():
+                return False
+            try:
+                Path(decision.normalized_path).relative_to(workspace_root)
+            except ValueError:
+                return False
+        return True
 
     def _read_runtime_clock(self) -> float | str:
         try:

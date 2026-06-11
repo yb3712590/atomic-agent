@@ -98,27 +98,42 @@ def options(**overrides):
     return OpenAICompatibleProviderOptions(**values)
 
 
-def invocation(task="Create work/real-provider-output.txt, then submit the result."):
+def invocation(
+    task="Create work/real-provider-output.txt, then submit the result.",
+    *,
+    tools=None,
+    budgets=None,
+    output_requirements=None,
+):
     return AgentInvocation(
         invocation_id="inv-real-provider-test",
         task=task,
         workspace_root="/tmp/atomic-agent-test/workspace",
         allowed_write_set=["work/"],
-        tools=["write_file", "submit_result"],
+        tools=tools or ["write_file", "submit_result"],
         permission_policy={"policy_ref": "policy://tests/real-provider"},
         provider_profile={"provider": "openai-compatible", "model": "provider-model"},
-        budgets={
+        budgets=budgets or {
             "max_steps": 4,
             "max_parse_failures": 1,
             "max_observation_chars": 10000,
             "max_wall_seconds": 3605.0,
         },
-        output_requirements={"summary": True, "event_stream": True, "artifacts": True},
+        output_requirements=output_requirements or {"summary": True, "event_stream": True, "artifacts": True},
     )
 
 
-def provider_context(task="Create work/real-provider-output.txt, then submit the result.", observations=()):
-    return ProviderContext(invocation=invocation(task), step=1, observations=tuple(observations))
+def provider_context(
+    task="Create work/real-provider-output.txt, then submit the result.",
+    observations=(),
+    *,
+    invocation_override=None,
+):
+    return ProviderContext(
+        invocation=invocation_override or invocation(task),
+        step=1,
+        observations=tuple(observations),
+    )
 
 
 def adapter(client, clock=None, opts=None):
@@ -276,6 +291,95 @@ def test_adapter_prompt_is_task_agnostic_and_uses_invocation_task():
     assert task in serialized
     assert "work/custom-from-task.txt" in serialized
     assert "work/real-provider-output.txt" not in serialized
+
+
+def test_adapter_prompt_uses_current_action_protocol_without_legacy_envelope():
+    client = FakeOpenAIClient(chunks=[chunk(VALID_ACTION_TEXT)])
+
+    adapter(client).complete(provider_context())
+
+    messages = client.requests[0]["messages"]
+    serialized = json.dumps(messages, sort_keys=True)
+    assert "action_envelope" not in serialized
+    system_payload = json.loads(messages[0]["content"])
+    assert system_payload["response_contract"]["return_only"] == "one JSON object"
+    assert system_payload["single_action_example"] == {
+        "action_id": "step-0001",
+        "action": "write_file",
+        "reason_summary": "Create a required file.",
+        "input": {"path": "work/example.txt", "content": "example"},
+    }
+
+
+def test_adapter_prompt_includes_explicit_batch_protocol_example():
+    client = FakeOpenAIClient(chunks=[chunk(VALID_ACTION_TEXT)])
+    ctx = provider_context(
+        invocation_override=invocation(
+            tools=["write_file", "run_command", "submit_result"],
+            budgets={
+                "max_steps": 4,
+                "max_parse_failures": 1,
+                "max_observation_chars": 10000,
+                "max_wall_seconds": 3605.0,
+                "max_actions_per_turn": 4,
+            },
+        )
+    )
+
+    adapter(client).complete(ctx)
+
+    system_payload = json.loads(client.requests[0]["messages"][0]["content"])
+    batch = system_payload["batch_action_example"]
+    assert batch["protocol"] == "agent-action-batch-v1"
+    assert batch["reason_summary"]
+    assert batch["actions"]
+    assert all(action["reason_summary"] for action in batch["actions"])
+    assert batch["actions"][-1] == {
+        "action_id": "step-0002",
+        "action": "run_command",
+        "reason_summary": "Run a declared command by id.",
+        "input": {"command_id": "check"},
+    }
+
+
+def test_adapter_prompt_includes_runtime_batch_budget_and_checkpoint_semantics():
+    client = FakeOpenAIClient(chunks=[chunk(VALID_ACTION_TEXT)])
+    ctx = provider_context(
+        invocation_override=invocation(
+            tools=["write_file", "run_command", "submit_result"],
+            budgets={
+                "max_steps": 4,
+                "max_parse_failures": 1,
+                "max_observation_chars": 10000,
+                "max_wall_seconds": 3605.0,
+                "max_actions_per_turn": 4,
+            },
+            output_requirements={
+                "summary": True,
+                "event_stream": True,
+                "artifacts": True,
+                "required_output_checkpoint": {
+                    "when_all_paths_exist": ["work/a.py", "work/b.py"],
+                    "run_command_id": "cmd.check-medium-scenario",
+                    "max_auto_runs": 2,
+                },
+            },
+        )
+    )
+
+    adapter(client).complete(ctx)
+
+    system_payload = json.loads(client.requests[0]["messages"][0]["content"])
+    assert system_payload["runtime_limits"]["max_actions_per_turn"] == 4
+    assert system_payload["required_output_checkpoint"] == {
+        "when_all_paths_exist": ["work/a.py", "work/b.py"],
+        "run_command_id": "cmd.check-medium-scenario",
+        "max_auto_runs": 2,
+        "semantics": (
+            "When all listed paths exist, runtime may automatically run the declared command. "
+            "After checkpoint observations, continue with fixes or submit_result only when complete."
+        ),
+    }
 
 
 def test_adapter_includes_observations_without_api_key():

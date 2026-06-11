@@ -1,6 +1,8 @@
+import json
+
 import pytest
 
-from atomic_agent.action_parser import ActionParseError, parse_agent_action
+from atomic_agent.action_parser import ActionParseError, parse_agent_action, parse_agent_turn
 from atomic_agent.models import AgentActionType
 
 
@@ -35,6 +37,109 @@ def test_parse_agent_action_accepts_run_command_with_command_id():
 
     assert action.action == AgentActionType.RUN_COMMAND
     assert action.input == {"command_id": "test"}
+
+
+def test_parse_agent_turn_accepts_single_action():
+    parsed = parse_agent_turn(
+        json.dumps(
+            {
+                "action_id": "step-0001",
+                "action": "write_file",
+                "reason_summary": "Create file.",
+                "input": {"path": "work/a.txt", "content": "hello"},
+            }
+        )
+    )
+
+    assert parsed.protocol == "agent-action-v1"
+    assert [action.action_id for action in parsed.actions] == ["step-0001"]
+
+
+def test_parse_agent_turn_accepts_explicit_batch_v1():
+    parsed = parse_agent_turn(
+        json.dumps(
+            {
+                "batch_id": "batch-0001",
+                "protocol": "agent-action-batch-v1",
+                "reason_summary": "Create and check package.",
+                "actions": [
+                    {
+                        "action_id": "step-0001",
+                        "action": "write_file",
+                        "reason_summary": "Create file.",
+                        "input": {"path": "work/a.txt", "content": "hello"},
+                    },
+                    {
+                        "action_id": "step-0002",
+                        "action": "run_command",
+                        "reason_summary": "Run declared check.",
+                        "input": {"command_id": "check"},
+                    },
+                ],
+            }
+        )
+    )
+
+    assert parsed.protocol == "agent-action-batch-v1"
+    assert parsed.batch_id == "batch-0001"
+    assert [action.action_id for action in parsed.actions] == ["step-0001", "step-0002"]
+
+
+def test_parse_agent_turn_rejects_bare_json_array():
+    with pytest.raises(ActionParseError, match="explicit batch object") as error:
+        parse_agent_turn(
+            json.dumps(
+                [
+                    {
+                        "action_id": "step-0001",
+                        "action": "write_file",
+                        "reason_summary": "Create file.",
+                        "input": {"path": "work/a.txt", "content": "hello"},
+                    }
+                ]
+            )
+        )
+
+    assert error.value.kind == "invalid_action_batch"
+
+
+def test_parse_agent_turn_rejects_concatenated_json_objects():
+    first = json.dumps(
+        {
+            "action_id": "step-0001",
+            "action": "write_file",
+            "reason_summary": "Create file.",
+            "input": {"path": "work/a.txt", "content": "hello"},
+        }
+    )
+    second = json.dumps(
+        {
+            "action_id": "step-0002",
+            "action": "run_command",
+            "reason_summary": "Run declared check.",
+            "input": {"command_id": "check"},
+        }
+    )
+
+    with pytest.raises(ActionParseError, match="valid JSON") as error:
+        parse_agent_turn(first + second)
+
+    assert error.value.kind == "invalid_json"
+
+
+def test_parse_agent_turn_rejects_batch_without_protocol():
+    with pytest.raises(ActionParseError, match="batch_like_without_protocol") as error:
+        parse_agent_turn(
+            json.dumps(
+                {
+                    "batch_id": "batch-0001",
+                    "reason_summary": "Missing protocol.",
+                    "actions": [],
+                }
+            )
+        )
+
+    assert error.value.kind == "batch_like_without_protocol"
 
 
 @pytest.mark.permission_negative

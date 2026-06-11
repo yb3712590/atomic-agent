@@ -185,22 +185,47 @@ class OpenAICompatibleProviderAdapter:
 
     def _messages(self, context: ProviderContext) -> list[dict[str, str]]:
         invocation = context.invocation
+        max_actions_per_turn = invocation.budgets.get("max_actions_per_turn", 1)
+        checkpoint = invocation.output_requirements.get("required_output_checkpoint")
         protocol = {
-            "action_envelope": {
-                "action_id": "stable unique string",
-                "action": "one enabled tool name",
-                "reason_summary": "short reason",
-                "input": "tool-specific object",
+            "response_contract": {
+                "return_only": "one JSON object",
+                "accepted_shapes": ["single AgentAction object", "AgentActionBatch object"],
+                "forbidden_output_styles": [
+                    "markdown",
+                    "code fences",
+                    "bare arrays",
+                    "multiple JSON objects",
+                    "free-form shell commands",
+                    "legacy nested wrappers",
+                ],
+            },
+            "single_action_example": self._single_action_example(invocation.tools),
+            "batch_action_example": self._batch_action_example(invocation.tools),
+            "runtime_limits": {
+                "max_actions_per_turn": max_actions_per_turn,
             },
             "rules": [
                 "Return exactly one JSON object and no markdown.",
                 "Do not wrap the JSON in code fences.",
+                "For multiple actions, return an AgentActionBatch object with protocol agent-action-batch-v1.",
+                "Each action must include action_id, action, reason_summary, and input.",
                 "Do not return shell command strings.",
                 "Use run_command only with command_id.",
                 "Only request tools listed in invocation.tools.",
                 "Use submit_result when the task is complete.",
             ],
         }
+        if isinstance(checkpoint, dict):
+            protocol["required_output_checkpoint"] = {
+                "when_all_paths_exist": checkpoint.get("when_all_paths_exist"),
+                "run_command_id": checkpoint.get("run_command_id"),
+                "max_auto_runs": checkpoint.get("max_auto_runs"),
+                "semantics": (
+                    "When all listed paths exist, runtime may automatically run the declared command. "
+                    "After checkpoint observations, continue with fixes or submit_result only when complete."
+                ),
+            }
         task_payload = {
             "task": invocation.task,
             "step": context.step,
@@ -220,6 +245,53 @@ class OpenAICompatibleProviderAdapter:
             {"role": "system", "content": json.dumps(protocol, sort_keys=True, ensure_ascii=False)},
             {"role": "user", "content": json.dumps(task_payload, sort_keys=True, ensure_ascii=False)},
         ]
+
+    def _single_action_example(self, tools: list[str]) -> dict[str, Any]:
+        if "write_file" in tools:
+            return {
+                "action_id": "step-0001",
+                "action": "write_file",
+                "reason_summary": "Create a required file.",
+                "input": {"path": "work/example.txt", "content": "example"},
+            }
+        if "submit_result" in tools:
+            return {
+                "action_id": "step-0001",
+                "action": "submit_result",
+                "reason_summary": "Submit the completed result.",
+                "input": {"summary": "completed", "produced_paths": [], "evidence_refs": []},
+            }
+        return {
+            "action_id": "step-0001",
+            "action": tools[0] if tools else "submit_result",
+            "reason_summary": "Request one enabled tool.",
+            "input": {},
+        }
+
+    def _batch_action_example(self, tools: list[str]) -> dict[str, Any]:
+        actions = [
+            {
+                "action_id": "step-0001",
+                "action": "write_file",
+                "reason_summary": "Create a required file.",
+                "input": {"path": "work/example.txt", "content": "example"},
+            }
+        ]
+        if "run_command" in tools:
+            actions.append(
+                {
+                    "action_id": "step-0002",
+                    "action": "run_command",
+                    "reason_summary": "Run a declared command by id.",
+                    "input": {"command_id": "check"},
+                }
+            )
+        return {
+            "batch_id": "batch-0001",
+            "protocol": "agent-action-batch-v1",
+            "reason_summary": "Execute ordered actions in one provider turn.",
+            "actions": actions,
+        }
 
     def _content_from_chunk(self, chunk: Any) -> str:
         choices = getattr(chunk, "choices", None)

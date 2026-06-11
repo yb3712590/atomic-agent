@@ -95,6 +95,40 @@ class AgentAction(StrictModel):
         return self
 
 
+class AgentActionBatch(StrictModel):
+    batch_id: str
+    protocol: str
+    reason_summary: str
+    actions: list[AgentAction]
+
+    @model_validator(mode="after")
+    def validate_batch(self):
+        if self.protocol != "agent-action-batch-v1":
+            raise ValueError("batch protocol must be agent-action-batch-v1")
+        if not self.actions:
+            raise ValueError("batch actions must not be empty")
+        seen: set[str] = set()
+        for action in self.actions:
+            if action.action_id in seen:
+                raise ValueError("batch action_id values must be unique")
+            seen.add(action.action_id)
+        submit_indexes = [
+            index
+            for index, action in enumerate(self.actions)
+            if action.action == AgentActionType.SUBMIT_RESULT
+        ]
+        if submit_indexes and submit_indexes[-1] != len(self.actions) - 1:
+            raise ValueError("submit_result must be the final batch action")
+        return self
+
+
+class ParsedAgentTurn(StrictModel):
+    protocol: str
+    actions: list[AgentAction]
+    batch_id: str | None = None
+    reason_summary: str | None = None
+
+
 class AgentEvent(StrictModel):
     event_id: str
     run_id: str

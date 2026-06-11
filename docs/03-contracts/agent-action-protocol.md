@@ -32,6 +32,49 @@ active
 
 多余字段默认拒绝，除非协议版本明确允许。
 
+## AgentActionBatch
+
+provider output（模型输出）可以显式使用批次协议一次提交多个有序动作：
+
+```json
+{
+  "batch_id": "batch-0001",
+  "protocol": "agent-action-batch-v1",
+  "reason_summary": "Create the initial package files and then run validation.",
+  "actions": [
+    {
+      "action_id": "step-0001",
+      "action": "write_file",
+      "reason_summary": "Create statistics module.",
+      "input": {"path": "work/forecast_engine/statistics.py", "content": "..."}
+    },
+    {
+      "action_id": "step-0002",
+      "action": "run_command",
+      "reason_summary": "Run declared validator.",
+      "input": {"command_id": "cmd.check-medium-scenario"}
+    }
+  ]
+}
+```
+
+要求：
+
+- `protocol` 必须等于 `agent-action-batch-v1`。
+- `actions` 必须非空，按数组顺序执行，每个子项仍使用 `AgentAction` schema。
+- 同一批次内 `action_id` 必须唯一。
+- `submit_result` 若出现在批次中，必须是最后一个 action。
+- 每个 action 必须单独产生 `action.parsed`、permission decision（权限判定）、tool attempt（工具尝试）或失败事件。
+- 批次 action 数受 `max_actions_per_turn` budget（每轮最大动作数预算）限制。
+
+以下输入仍必须拒绝，不做静默兼容：
+
+- 裸 JSON array（数组）。
+- 多个 JSON object（对象）串联。
+- Markdown code fence（代码块）包裹 JSON。
+- 包含 `actions` 或 `batch_id` 但缺少 `protocol` 的 batch-like output（批次形状输出）。
+- 旧 `action_envelope` 结构。
+
 ## P0 Actions
 
 ### list_files
